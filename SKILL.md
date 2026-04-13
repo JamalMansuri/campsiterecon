@@ -80,19 +80,32 @@ Cross-month ranges work (e.g. `--start 2026-07-30 --end 2026-08-02`).
 
 **Output is a single JSON object with a `results[]` array.** Each result has `name`, `facility_id`, `available_dates`, `reservation_url`, `contiguous`.
 
-**Present as a Markdown table, sorted contiguous-first:**
+**First reply — availability only, no links, no tables.** Telegram doesn't render Markdown tables, so present as a plain bullet list, contiguous first:
 
-| Campground | Dates | Booking | Contiguous |
-|---|---|---|---|
-| Pines Stanislaus | Jul 3, 4, 5 | [book](https://www.recreation.gov/camping/campgrounds/10180062) | ✅ |
-| Lost Claim | Jul 3, 4, 5 | [book](https://www.recreation.gov/camping/campgrounds/234761) | ✅ |
-| Summerdale | Jul 5 | [book](https://www.recreation.gov/camping/campgrounds/233837) |  |
+```
+⭐ Pines Stanislaus — Jul 3, 4, 5
+⭐ Lost Claim — Jul 3, 4, 5
+   Summerdale — Jul 5
+```
+
+If the user asks for links, follow with a separate booking section:
+
+```
+Booking links:
+- Pines Stanislaus: https://www.recreation.gov/camping/campgrounds/10180062
+- Lost Claim: https://www.recreation.gov/camping/campgrounds/234761
+- Summerdale: https://www.recreation.gov/camping/campgrounds/233837
+```
 
 Rules:
-- Sort `contiguous: true` rows first.
+
+- Sort `contiguous: true` rows first, star them with ⭐.
 - Format `available_dates` compactly: "Jul 3, 4, 5" — not ISO strings.
-- Use `[book](url)` links, not raw URLs.
-- Empty table → "No campgrounds with availability for <query> between <start> and <end>."
+- **Do not use Markdown tables in Telegram replies.**
+- **Default behavior:** first reply with clean availability only.
+- Only provide booking links in a second reply if the user asks for them.
+- If links are requested, prefer a separate `Booking links:` section instead of attaching a link to every bullet.
+- Empty result → `No campgrounds with availability for <query> between <start> and <end>.`
 - No weather in this mode. Do not call it.
 - Wilderness-permit-only sites (Point Reyes pattern) will not appear — if the user asks about those by name, route them to mode 1 with the matching preset.
 
