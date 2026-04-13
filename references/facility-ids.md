@@ -62,6 +62,55 @@ Point Reyes backcountry operates as **wilderness permits** (not standard drive-i
 
 ---
 
+## Pinnacles National Park — ~2 hours from SF
+
+**Rec Area location:** `36.491, -121.198`
+**Config key:** `pinnacles`
+
+| Name | Facility ID | Type | Notes |
+|------|-------------|------|-------|
+| Pinnacles Campground | 234015 | Drive-in | Only campground in the park; low elevation so usable year-round |
+
+---
+
+## Kings Canyon National Park — ~5 hours from SF
+
+**Rec Area location (Grant Grove):** `36.740, -118.962`
+**Config key:** `kings_canyon`
+**ParentRecAreaID:** `2931` (shared with Sequoia NP — "Sequoia & Kings Canyon")
+
+| Name | Facility ID | Type | Notes |
+|------|-------------|------|-------|
+| Sentinel | 253917 | Drive-in | Grant Grove area |
+| Moraine | 10044761 | Drive-in | Cedar Grove area (seasonal — typically closed until late May) |
+| Sheep Creek | 10044765 | Drive-in | Cedar Grove area (seasonal) |
+| Azalea | 10124502 | Drive-in | Grant Grove area, year-round |
+| Sunset | 234752 | Drive-in | Grant Grove area |
+| Crystal Springs | 10124445 | Drive-in | Grant Grove area |
+
+> Most Cedar Grove campgrounds open ~late May through October. Expect empty availability returns in winter/spring — not a bug.
+
+---
+
+## Sequoia National Park — ~4.5 hours from SF
+
+**Rec Area location (Giant Forest / Lodgepole):** `36.600, -118.726`
+**Config key:** `sequoia`
+**ParentRecAreaID:** `2931`
+
+| Name | Facility ID | Type | Notes |
+|------|-------------|------|-------|
+| Lodgepole | 232461 | Drive-in | Near Giant Forest, seasonal |
+| Dorst Creek | 232460 | Drive-in | Seasonal |
+| Buckeye Flat | 249982 | Drive-in | Foothills, year-round |
+| Potwisha | 249979 | Drive-in | Foothills, year-round |
+| Cold Springs | 246864 | Drive-in | Mineral King area (seasonal, late May onward) |
+| Atwell Mill | 10044710 | Drive-in | Mineral King area (seasonal) |
+
+> **Sequoia & Kings Canyon Wilderness Permits** are issued under a different RIDB entry (FacilityID `445857`). Not currently wired into `recon/config.py`; if adding, treat it as a permit-only entry.
+
+---
+
 ## Yosemite — ~3.5 hours from SF
 
 | Name | Facility ID | Type | Notes |

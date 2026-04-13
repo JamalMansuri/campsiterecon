@@ -6,6 +6,15 @@ _OPEN     = {"Available", "Open"}
 _REC_BASE = "https://www.recreation.gov"
 
 
+def _reservation_url(camp: Camp) -> str:
+    """Permit-system camps always book through /permits/, even when the
+    campground endpoint returns data for them (Rec.gov started populating
+    Point Reyes through that endpoint in 2026 — URL must still be /permits/)."""
+    if camp.permit_id:
+        return f"{_REC_BASE}/permits/{camp.permit_id}"
+    return f"{_REC_BASE}/camping/campgrounds/{camp.facility_id}"
+
+
 def _weekend_dates(friday: date) -> set[date]:
     return {friday, friday + timedelta(1), friday + timedelta(2)}
 
@@ -38,7 +47,7 @@ def _parse_campground(raw: dict, camp: Camp, friday: date) -> CampsiteResult:
         facility_id     = camp.facility_id,
         available_dates = sorted_dates,
         permit_required = camp.permit_id is not None,
-        reservation_url = f"{_REC_BASE}/camping/campgrounds/{camp.facility_id}",
+        reservation_url = _reservation_url(camp),
         contiguous      = _is_contiguous(available, friday),
     )
 
@@ -65,7 +74,7 @@ def _parse_permit(raw: dict, camp: Camp, friday: date) -> CampsiteResult:
         facility_id     = camp.facility_id,
         available_dates = sorted_dates,
         permit_required = True,
-        reservation_url = f"{_REC_BASE}/permits/{camp.permit_id}",
+        reservation_url = _reservation_url(camp),
         contiguous      = _is_contiguous(available, friday),
     )
 

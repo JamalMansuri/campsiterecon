@@ -1,6 +1,10 @@
 # Campsite Recon
 
-Weekend campsite availability checker for Bay Area locations. Queries Recreation.gov and Open-Meteo, outputs structured JSON consumed by OpenClaw → Telegram.
+Two modes:
+1. **Weekend recon** — preset Bay Area locations, upcoming weekend, with weather (Recreation.gov + Open-Meteo).
+2. **Free-text search** — any location (e.g. "Yosemite") over an arbitrary date range, no weather. For planning trips months ahead.
+
+Both output structured JSON consumed by OpenClaw → Telegram.
 
 ---
 
@@ -9,27 +13,32 @@ Weekend campsite availability checker for Bay Area locations. Queries Recreation
 ```mermaid
 flowchart TD
     CLI["main.py\nCLI entry point"]
-    CFG["config.py\nLocation + facility IDs"]
-    AV["availability.py\nWhich endpoints to call"]
-    AC["api_client.py\nHTTP transport"]
-    PR["parser.py\nExtract + filter relevant data"]
-    WX["weather.py\nWeekend forecast"]
-    MDL["models.py\nCampsiteResult · WeatherDay · LocationReport"]
+    CFG["config.py\nPreset locations + facility IDs"]
+    AV["availability.py\nCampground → permit fallback"]
+    SR["search.py\nRIDB query → multi-month scan"]
+    AC["api_client.py\nHTTP transport (Rec.gov + RIDB)"]
+    PR["parser.py\nRaw JSON → CampsiteResult"]
+    WX["weather.py\nFri/Sat/Sun forecast"]
+    MDL["models.py\nCampsiteResult · WeatherDay · LocationReport\nSearchResult · SearchReport"]
     REC[("recreation.gov")]
+    RIDB[("ridb.recreation.gov")]
     MET[("open-meteo.com")]
     OC["OpenClaw"]
     TG["Telegram"]
 
-    CLI --> CFG
+    CLI -->|weekend mode| CFG
+    CLI -->|search mode|  SR
     CLI --> WX
     CFG --> AV
     AV --> AC
+    SR --> AC
     AC <-->|HTTPS| REC
+    AC <-->|HTTPS| RIDB
     WX <-->|HTTPS| MET
-    AC -->|raw JSON| AV
     AV -->|tagged response| PR
     PR -->|CampsiteResult| MDL
-    WX -->|WeatherDay| MDL
+    SR -->|SearchResult|  MDL
+    WX -->|WeatherDay|    MDL
     MDL --> CLI
     CLI -->|stdout JSON| OC
     OC --> TG
@@ -39,40 +48,61 @@ flowchart TD
 
 | File | Responsibility |
 |---|---|
-| [recon/models.py](recon/models.py) | Data contracts — defines `CampsiteResult`, `WeatherDay`, `LocationReport` |
-| [recon/config.py](recon/config.py) | Location definitions with facility + permit IDs. Add new locations here only |
-| [recon/api_client.py](recon/api_client.py) | HTTP transport to recreation.gov. Knows nothing about campsites |
-| [recon/availability.py](recon/availability.py) | Decides which endpoint to call; handles campground → permit fallback |
-| [recon/parser.py](recon/parser.py) | Transforms raw API responses into `CampsiteResult`. Filters non-bookable sites |
+| [recon/models.py](recon/models.py) | Data contracts — `CampsiteResult`, `WeatherDay`, `LocationReport`, `SearchResult`, `SearchReport` |
+| [recon/config.py](recon/config.py) | Preset location definitions with facility + permit IDs. Add new presets here only |
+| [recon/api_client.py](recon/api_client.py) | HTTP transport. Rec.gov availability endpoints + RIDB facility search. Knows nothing about campsites |
+| [recon/availability.py](recon/availability.py) | Weekend mode: decides which endpoint to call; handles campground → permit fallback |
+| [recon/parser.py](recon/parser.py) | Weekend mode: transforms raw responses into `CampsiteResult`, filters non-bookable, flags contiguous nights |
+| [recon/search.py](recon/search.py) | Search mode: RIDB query → facility list → multi-month availability scan → `SearchReport` |
 | [recon/weather.py](recon/weather.py) | Fetches Fri/Sat/Sun forecast from Open-Meteo. Returns `WeatherDay` per day |
-| [main.py](main.py) | CLI entry point. Orchestrates all modules, prints JSON to stdout |
+| [main.py](main.py) | CLI entry point. Routes between weekend + search modes, prints JSON to stdout |
 | [SKILL.md](SKILL.md) | OpenClaw skill definition — copy to `~/.openclaw/skills/campsite-recon/` |
 
-## Supported locations
+## Supported preset locations
 
 | Key | Location |
 |---|---|
 | `point_reyes` | Point Reyes National Seashore (wilderness permits) |
 | `big_sur` | Big Sur (drive-in campgrounds) |
+| `pinnacles` | Pinnacles National Park |
+| `kings_canyon` | Kings Canyon National Park |
+| `sequoia` | Sequoia National Park |
 
-To add a location: look up the facility IDs on RIDB, add an entry to [recon/config.py](recon/config.py). Nothing else needs changing.
+To add a preset: look up the facility IDs on RIDB, add an entry to [recon/config.py](recon/config.py). Nothing else needs changing.
+
+To check a location that isn't a preset, use search mode — no code change required.
 
 ## Usage
 
+**Weekend mode** — presets + weather:
+
 ```bash
-# All locations, upcoming weekend
+# All preset locations, upcoming weekend
 python main.py
 
-# Specific location
+# Specific preset
 python main.py --location point_reyes
 
 # Specific weekend (pass the Friday)
 python main.py --location big_sur --date 2026-05-01
 ```
 
+**Search mode** — arbitrary location + date range, no weather:
+
+```bash
+# Yosemite over July 4th weekend
+python main.py --search "Yosemite" --start 2026-07-03 --end 2026-07-05
+
+# Cross-month range works too
+python main.py --search "Tahoe" --start 2026-07-30 --end 2026-08-02
+```
+
+Search mode only hits the campground endpoint — wilderness-permit-only facilities (Point Reyes pattern) are skipped. For those, use a preset.
+
 ## API key
 
-Stored in macOS Keychain — never hardcoded:
+Stored in macOS Keychain — never hardcoded. Required for RIDB search (weekend mode uses unauthenticated availability endpoints, so it only needs the key for search mode, but the CLI loads it unconditionally):
+
 ```bash
 security add-generic-password -a "$USER" -s "recreation-gov-api" -w "<YOUR_KEY>"
 ```

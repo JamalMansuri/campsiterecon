@@ -11,6 +11,7 @@ from recon.availability import fetch_camp_availability
 from recon.config import LOCATIONS, Location
 from recon.models import LocationReport
 from recon.parser import parse
+from recon.search import search
 from recon.weather import fetch_weekend_weather
 
 
@@ -50,18 +51,31 @@ def _run_location(loc: Location, client: RecGovClient, friday: date) -> Location
 
 def main() -> None:
     p = argparse.ArgumentParser(description="Campsite availability checker")
-    p.add_argument("--location", choices=list(LOCATIONS), help="Location key")
+    p.add_argument("--location", choices=list(LOCATIONS), help="Preset location key")
     p.add_argument("--date", help="Friday date YYYY-MM-DD (default: next Friday)")
+    p.add_argument("--search", help="Free-text location query (e.g. 'Yosemite')")
+    p.add_argument("--start",  help="Search start date YYYY-MM-DD")
+    p.add_argument("--end",    help="Search end date YYYY-MM-DD")
     args = p.parse_args()
-
-    friday = date.fromisoformat(args.date) if args.date else _upcoming_friday()
 
     api_key = _get_api_key()
     if not api_key:
         print(json.dumps({"error": "No API key — store it in Keychain under 'recreation-gov-api'"}))
         sys.exit(1)
 
-    client    = RecGovClient(api_key)
+    client = RecGovClient(api_key)
+
+    if args.search:
+        if not (args.start and args.end):
+            print(json.dumps({"error": "--search requires --start and --end"}))
+            sys.exit(1)
+        start  = date.fromisoformat(args.start)
+        end    = date.fromisoformat(args.end)
+        report = search(client, args.search, start, end)
+        print(json.dumps(asdict(report), indent=2))
+        return
+
+    friday    = date.fromisoformat(args.date) if args.date else _upcoming_friday()
     locations = [LOCATIONS[args.location]] if args.location else list(LOCATIONS.values())
     reports   = [asdict(_run_location(loc, client, friday)) for loc in locations]
 

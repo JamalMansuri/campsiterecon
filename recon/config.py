@@ -40,18 +40,38 @@ LOCATIONS: dict[str, Location] = {
             Camp("Limekiln SP",      "10149046"),
         ),
     ),
-    # TODO: Verify facility IDs for Pinnacles via RIDB before adding
-    # "pinnacles": Location(
-    #     name="Pinnacles National Park",
-    #     lat=36.491,
-    #     lon=-121.198,
-    #     camps=(),
-    # ),
-    # TODO: Verify facility IDs for Kings Canyon / Sequoia via RIDB before adding
-    # "kings_canyon": Location(
-    #     name="Kings Canyon / Sequoia",
-    #     lat=36.887,
-    #     lon=-118.555,
-    #     camps=(),
-    # ),
+    "pinnacles": Location(
+        name="Pinnacles National Park",
+        lat=36.491,
+        lon=-121.198,
+        camps=(
+            Camp("Pinnacles Campground", "234015"),
+        ),
+    ),
+    "kings_canyon": Location(
+        name="Kings Canyon National Park",
+        lat=36.740,
+        lon=-118.962,
+        camps=(
+            Camp("Sentinel",        "253917"),
+            Camp("Moraine",         "10044761"),
+            Camp("Sheep Creek",     "10044765"),
+            Camp("Azalea",          "10124502"),
+            Camp("Sunset",          "234752"),
+            Camp("Crystal Springs", "10124445"),
+        ),
+    ),
+    "sequoia": Location(
+        name="Sequoia National Park",
+        lat=36.600,
+        lon=-118.726,
+        camps=(
+            Camp("Lodgepole",    "232461"),
+            Camp("Dorst Creek",  "232460"),
+            Camp("Buckeye Flat", "249982"),
+            Camp("Potwisha",     "249979"),
+            Camp("Cold Springs", "246864"),
+            Camp("Atwell Mill",  "10044710"),
+        ),
+    ),
 }

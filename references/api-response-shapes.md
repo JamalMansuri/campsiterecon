@@ -29,7 +29,7 @@ Recreation.gov has two completely different availability endpoints with differen
 | Campground | Drive-in / standard sites | `campsites` |
 | Permit | Wilderness / backcountry | `payload.availability` |
 
-**Point Reyes is permit-only.** The campground endpoint returns `{}` for all 4 wilderness camps. Always fall back to the permit endpoint when `campsites` is empty or absent.
+**Point Reyes is permit-booked but now returns campground data too.** As of early 2026 Rec.gov began populating the standard campground endpoint for Point Reyes wilderness camps (Sky: 51 sites, Coast: 75, Glen: 107, Wildcat: 68). Booking still happens through `/permits/{permit_id}` — the campground endpoint is read-only metadata. Never build a `/camping/campgrounds/` URL for a facility with a `permit_id`; see "Reservation URL Patterns" below. Earlier versions of this doc said the campground endpoint returned `{}` for Point Reyes — that's no longer true.
 
 **Big Sur uses the campground endpoint.** Standard drive-in sites, no permit system.
 
@@ -130,29 +130,31 @@ GET /api/permits/{permitId}/availability/month
 
 ### Real observation — Point Reyes (April 2026)
 
-All 4 wilderness camps (Sky, Coast, Glen, Wildcat) returned `remaining: 0` for the upcoming weekend — fully booked. This is normal for Point Reyes; the 90-day booking window opens at midnight and sells out within minutes.
+As of April 2026 the campground endpoint returns populated data for all 4 wilderness camps, so we parse availability via `_parse_campground` in practice. Coast Camp and Wildcat Camp showed all 3 weekend nights open for 2026-04-17/18/19; Sky and Glen were fully reserved. When the campground endpoint is stale or closed the permit endpoint remains the authoritative fallback — do not remove that path.
 
 ---
 
 ## Reservation URL Patterns
 
-The URL to give users depends on which endpoint type the camp uses:
+**The URL depends on the camp's configuration, not on which endpoint returned data.** A facility with a `permit_id` always books through `/permits/`, even when the campground endpoint returns populated availability (Point Reyes after early 2026).
 
 ```python
-# Campground (drive-in)
-f"https://www.recreation.gov/camping/campgrounds/{facility_id}"
-
-# Permit (wilderness)
-f"https://www.recreation.gov/permits/{permit_id}"
+# Rule: key off camp.permit_id, not the endpoint that answered.
+def reservation_url(camp):
+    if camp.permit_id:
+        return f"https://www.recreation.gov/permits/{camp.permit_id}"
+    return f"https://www.recreation.gov/camping/campgrounds/{camp.facility_id}"
 ```
 
-Do not use the campground URL for permit-only camps — it will land the user on the wrong page.
+Implemented as `_reservation_url()` in `recon/parser.py`. Both `_parse_campground` and `_parse_permit` route through it, so Point Reyes URLs stay correct even when the campground endpoint is the one that answered.
+
+Do not use the campground URL for permit-booked camps — it will land the user on the wrong page (Rec.gov redirects campground URLs for permit-only facilities to a search, not the booking flow).
 
 ---
 
 ## The Campground → Permit Fallback Pattern
 
-Some facilities are listed in RIDB with a `FacilityID` but their actual bookings run through the permit system. Point Reyes is the clearest example — the facility IDs exist, but the campground availability endpoint returns empty.
+Some facilities are listed in RIDB with a `FacilityID` but their actual bookings run through the permit system. Point Reyes was historically the clearest example — the facility IDs existed, but the campground availability endpoint returned empty. That changed in early 2026 (see "Real observation — Point Reyes" above), but the fallback path remains load-bearing: other permit-only facilities still fit the old pattern, and Rec.gov can silently revert Point Reyes at any time.
 
 The pattern we use in `availability.py`:
 
@@ -160,6 +162,59 @@ The pattern we use in `availability.py`:
 2. If response is `None` or `campsites` is empty → try permit endpoint with `permit_id`
 3. Tag the response `{"type": "campground"}` or `{"type": "permit"}` so `parser.py` knows which shape to expect
 4. If both return nothing → return `None` (camp may be closed or offline)
+
+**URL building is independent of this path.** Even when step 1 succeeds for a permit-booked facility, `parser.py::_reservation_url()` still builds `/permits/{permit_id}` because it keys off `camp.permit_id`, not the endpoint that answered.
+
+---
+
+## RIDB Facility Search (used by search mode)
+
+```
+GET https://ridb.recreation.gov/api/v1/facilities
+    ?query={free_text}
+    &facilitytype=Campground
+    &limit=50
+    &apikey={KEY}
+```
+
+### Shape
+
+```json
+{
+  "RECDATA": [
+    {
+      "FacilityID": "233837",
+      "FacilityName": "SUMMERDALE CAMPGROUND",
+      "FacilityTypeDescription": "Campground",
+      "Reservable": true,
+      "FacilityLatitude": 37.5183,
+      "FacilityLongitude": -119.6367,
+      "ParentRecAreaID": "2991"
+    }
+  ],
+  "METADATA": { ... }
+}
+```
+
+### Key observations
+
+- `apikey` query param is **required** — RIDB is the only endpoint in this project that uses the API key. The availability endpoints are unauthenticated.
+- `FacilityName` comes back SCREAMING CAPS — `.title()` it before presenting.
+- Always filter `Reservable: true` — RIDB returns day-use areas, visitor centres, and closed facilities mixed in.
+- `facilitytype=Campground` narrows to campgrounds but still returns some non-campable results — filter on `Reservable` as a second pass.
+- `FacilityID` is the same ID used by the `/camps/availability/campground/{id}/month` endpoint — no translation needed.
+- Free-text queries are loose: searching "Yosemite" returns Stanislaus NF and Sierra NF campgrounds in the surrounding area, not just inside YNP. This is usually what the user wants.
+- Some facilities are permit-only (Point Reyes pattern) and will not return availability via the campground endpoint. The search flow intentionally skips the permit fallback — for those, use a preset config entry with an explicit `permit_id`.
+
+### Multi-month range scanning
+
+The availability endpoint is always per-month. To cover a date range:
+
+1. Walk `(year, month)` tuples from `start.year/month` to `end.year/month` inclusive.
+2. Call `campground_month` for each.
+3. Merge the open dates from each response, filtering to the exact target range.
+
+See `recon/search.py::_months_spanned` for the implementation.
 
 ---
 

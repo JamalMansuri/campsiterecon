@@ -4,7 +4,7 @@
 
 **Base URL:** `https://ridb.recreation.gov/api/v1`
 **Auth:** `apikey` query param (or `apikey` header)
-**API Key:** `REDACTED_API_KEY`
+**API Key:** Stored in macOS Keychain as `recreation-gov-api`. Load with `security find-generic-password -a "$USER" -s "recreation-gov-api" -w`. Never hardcode in this repo.
 **Docs:** https://ridb.recreation.gov/docs
 
 ### Search Facilities
