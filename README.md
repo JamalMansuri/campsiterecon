@@ -11,37 +11,30 @@ Both output structured JSON consumed by OpenClaw → Telegram.
 ## How it works
 
 ```mermaid
-flowchart TD
-    CLI["main.py<br/>CLI entry point"]
-    CFG["config.py<br/>Preset locations and facility IDs"]
-    AV["availability.py<br/>Campground to permit fallback"]
-    SR["search.py<br/>RIDB query, multi-month scan"]
-    AC["api_client.py<br/>HTTP transport for Rec.gov and RIDB"]
-    PR["parser.py<br/>Raw JSON to CampsiteResult"]
-    WX["weather.py<br/>Fri Sat Sun forecast"]
-    MDL["models.py<br/>CampsiteResult, WeatherDay, LocationReport<br/>SearchResult, SearchReport"]
-    REC[("recreation.gov")]
-    RIDB[("ridb.recreation.gov")]
-    MET[("open-meteo.com")]
-    OC["OpenClaw"]
-    TG["Telegram"]
+flowchart LR
+    TG["Telegram"] --> OC["OpenClaw"]
+    OC -->|shell exec| CLI["main.py"]
 
-    CLI -->|weekend mode| CFG
-    CLI -->|search mode| SR
-    CLI --> WX
-    CFG --> AV
-    AV --> AC
+    CLI -->|weekend mode| CFG["config.py"]
+    CLI -->|search mode| SR["search.py"]
+    CLI --> WX["weather.py"]
+
+    CFG --> AV["availability.py"]
+    AV --> AC["api_client.py"]
     SR --> AC
-    AC <-->|HTTPS| REC
-    AC <-->|HTTPS| RIDB
-    WX <-->|HTTPS| MET
-    AV -->|tagged response| PR
-    PR -->|CampsiteResult| MDL
-    SR -->|SearchResult| MDL
-    WX -->|WeatherDay| MDL
+
+    AC <--> REC[("recreation.gov")]
+    AC <--> RIDB[("ridb.recreation.gov")]
+    WX <--> MET[("open-meteo.com")]
+
+    AV --> PR["parser.py"]
+    PR --> MDL["models.py"]
+    SR --> MDL
+    WX --> MDL
     MDL --> CLI
-    CLI -->|stdout JSON| OC
-    OC --> TG
+
+    CLI -.->|stdout JSON| OC
+    OC -.->|reply| TG
 ```
 
 ## Modules
