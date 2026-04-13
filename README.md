@@ -12,14 +12,14 @@ Both output structured JSON consumed by OpenClaw → Telegram.
 
 ```mermaid
 flowchart TD
-    CLI["main.py\nCLI entry point"]
-    CFG["config.py\nPreset locations + facility IDs"]
-    AV["availability.py\nCampground → permit fallback"]
-    SR["search.py\nRIDB query → multi-month scan"]
-    AC["api_client.py\nHTTP transport (Rec.gov + RIDB)"]
-    PR["parser.py\nRaw JSON → CampsiteResult"]
-    WX["weather.py\nFri/Sat/Sun forecast"]
-    MDL["models.py\nCampsiteResult · WeatherDay · LocationReport\nSearchResult · SearchReport"]
+    CLI["main.py<br/>CLI entry point"]
+    CFG["config.py<br/>Preset locations and facility IDs"]
+    AV["availability.py<br/>Campground to permit fallback"]
+    SR["search.py<br/>RIDB query, multi-month scan"]
+    AC["api_client.py<br/>HTTP transport for Rec.gov and RIDB"]
+    PR["parser.py<br/>Raw JSON to CampsiteResult"]
+    WX["weather.py<br/>Fri Sat Sun forecast"]
+    MDL["models.py<br/>CampsiteResult, WeatherDay, LocationReport<br/>SearchResult, SearchReport"]
     REC[("recreation.gov")]
     RIDB[("ridb.recreation.gov")]
     MET[("open-meteo.com")]
@@ -27,7 +27,7 @@ flowchart TD
     TG["Telegram"]
 
     CLI -->|weekend mode| CFG
-    CLI -->|search mode|  SR
+    CLI -->|search mode| SR
     CLI --> WX
     CFG --> AV
     AV --> AC
@@ -37,8 +37,8 @@ flowchart TD
     WX <-->|HTTPS| MET
     AV -->|tagged response| PR
     PR -->|CampsiteResult| MDL
-    SR -->|SearchResult|  MDL
-    WX -->|WeatherDay|    MDL
+    SR -->|SearchResult| MDL
+    WX -->|WeatherDay| MDL
     MDL --> CLI
     CLI -->|stdout JSON| OC
     OC --> TG
@@ -98,14 +98,6 @@ python main.py --search "Tahoe" --start 2026-07-30 --end 2026-08-02
 ```
 
 Search mode only hits the campground endpoint — wilderness-permit-only facilities (Point Reyes pattern) are skipped. For those, use a preset.
-
-## API key
-
-Stored in macOS Keychain — never hardcoded. Required for RIDB search (weekend mode uses unauthenticated availability endpoints, so it only needs the key for search mode, but the CLI loads it unconditionally):
-
-```bash
-security add-generic-password -a "$USER" -s "recreation-gov-api" -w "<YOUR_KEY>"
-```
 
 ## OpenClaw setup
 
