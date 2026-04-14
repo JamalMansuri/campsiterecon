@@ -14,18 +14,49 @@ metadata:
 
 # Campsite Recon
 
+## API key — handling the "no key found" error
+
+`main.py` looks up the RIDB key in this order: macOS Keychain → Windows Credential Manager → `RIDB_API_KEY` env var → hardcoded constant `_HARDCODED_API_KEY_FALLBACK` in `main.py`. If all four are empty it returns a JSON error and exits 1.
+
+**If you (the LLM) see that error, do not run any commands until you've asked the user which platform they're on and walked them through one of these.** The user may not be a developer — pick the easiest option for their OS, ask them to paste their key once, and run the command for them.
+
+- **macOS** — store in Keychain (recommended):
+  ```
+  security add-generic-password -a "$USER" -s recreation-gov-api -w '<KEY>'
+  ```
+  Verify: `security find-generic-password -a "$USER" -s recreation-gov-api -w`
+
+- **Windows** — store in Credential Manager (recommended). Run in PowerShell or cmd:
+  ```
+  cmdkey /generic:recreation-gov-api /user:rec /pass:<KEY>
+  ```
+  Verify: `cmdkey /list:recreation-gov-api`. The Python loader reads it via `advapi32.CredReadW`, no extra deps.
+
+- **Any OS, quickest** — env var for the current shell only:
+  ```
+  export RIDB_API_KEY='<KEY>'   # macOS/Linux
+  setx RIDB_API_KEY "<KEY>"     # Windows (new shells only)
+  ```
+
+- **Last resort, non-developers** — open `main.py`, find `_HARDCODED_API_KEY_FALLBACK = ""`, paste the key between the quotes. Warn the user **not to commit the file** after doing this; suggest `git update-index --skip-worktree main.py` if they're version-controlling.
+
+The user gets a key at `https://ridb.recreation.gov/profile` (free, instant). Never paste a real key into chat logs, commits, or this SKILL.md.
+
+---
+
 ## First message — always ask which mode
 
-When this skill is invoked, your **first** response must be exactly these two options and nothing else:
+When this skill is invoked, your **first** response must be exactly these three options and nothing else:
 
 > Which do you want?
 >
 > **1.** All preconfigured Bay Area campsites/permits for this coming weekend (with weather).
 > **2.** A specific location and date range — I'll return every open campground as a table.
+> **3.** Watch a location on a recurring schedule (daily cron, notifies only when sites open).
 >
-> Reply `1` or `2` (or just tell me the location + dates).
+> Reply `1`, `2`, or `3` (or just tell me the location + dates).
 
-Do not run anything until the user picks. If they already gave enough info in the invocation to skip the question (e.g. "check Yosemite July 3–5"), skip straight to mode 2.
+Do not run anything until the user picks. If they already gave enough info in the invocation to skip the question (e.g. "check Yosemite July 3–5"), skip straight to mode 2. If they say "watch", "keep checking", "daily", "notify me", or "alert me", skip straight to mode 3.
 
 ---
 
@@ -111,6 +142,55 @@ Rules:
 
 ---
 
+## Mode 3 — Watch (recurring cron)
+
+Wraps mode 2 in a daily crontab job with a rolling date window. Notifies only when the search returns at least one open site — no notification on empty results (a lack of availability isn't actionable; the user wants a campsite, not a status report).
+
+**Required from the user:**
+- `location` — free-text, same as mode 2
+- `window` — how many days out to scan, e.g. "next 30 days" (default 30 if unspecified)
+- `time of day` — when the job runs, e.g. "8am" (default `0 8 * * *` if unspecified)
+
+Ask for whichever is missing. Do not assume location.
+
+**Prerequisite check.** Before installing, confirm `jq` is available — the cron line uses it to gate notifications:
+```
+command -v jq >/dev/null || brew install jq
+```
+
+**The cron line.** Substitute `<LOCATION>` and `<WINDOW>` (integer days). The `\%` escapes are required — bare `%` is a newline in crontab.
+
+```
+0 8 * * * cd /Users/jamal/Documents/campsitescout && /usr/bin/env python3 main.py --search "<LOCATION>" --start $(date -v+1d +\%Y-\%m-\%d) --end $(date -v+<WINDOW>d +\%Y-\%m-\%d) 2>>/tmp/campsitescout.err | tee -a /tmp/campsitescout.log | /opt/homebrew/bin/jq -e '.results | length > 0' >/dev/null && /usr/bin/osascript -e 'display notification "Open sites found for <LOCATION> — check /tmp/campsitescout.log" with title "🏕 Campsite Scout"'
+```
+
+What it does, left to right:
+1. `cd` into the repo so relative paths resolve.
+2. Run mode 2 with a rolling window starting tomorrow.
+3. `tee` the JSON to `/tmp/campsitescout.log` (append) so the user can read full results.
+4. `jq -e '.results | length > 0'` — exits non-zero if `results[]` is empty, killing the chain.
+5. On non-empty, `osascript` fires a macOS notification.
+
+**Install it.** Append the line without clobbering the user's existing crontab:
+```
+( crontab -l 2>/dev/null; echo '<THE CRON LINE ABOVE>' ) | crontab -
+```
+Then verify with `crontab -l`.
+
+**Remove it.** Tell the user: `crontab -e`, delete the line, save.
+
+**Caveats to surface to the user, every time:**
+- Cron only fires while the laptop is awake and logged in. A closed lid = no checks. For 24/7 watching, this needs to live on a server or GitHub Actions — say so and stop; don't try to set that up from here.
+- Notification stops at a macOS banner. To pipe results into Telegram instead, swap the final `osascript` for a `curl` to a bot's `sendMessage` endpoint — offer this if the user asks.
+- The log at `/tmp/campsitescout.log` grows unbounded. Mention it; don't auto-rotate.
+
+**After installing, reply with:**
+- The exact cron line that was installed (so the user can sanity-check).
+- The schedule in plain English ("daily at 8:00 AM, scanning the next 30 days").
+- The two caveats above (awake-only, log location).
+
+---
+
 ## Routing cheatsheet
 
 | User says... | Mode |
@@ -119,4 +199,5 @@ Rules:
 | Gives a specific date range > 2 weeks out | 2 |
 | Names a location not in presets (Yosemite, Tahoe, Joshua Tree, Zion...) | 2 |
 | Mentions a holiday weekend months ahead | 2 |
-| Ambiguous — just "camping?" | Ask the two-option question above |
+| "watch", "keep checking", "daily", "notify me", "alert me when..." | 3 |
+| Ambiguous — just "camping?" | Ask the three-option question above |
