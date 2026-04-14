@@ -40,11 +40,11 @@ flowchart LR
     CLI -.->|stdout JSON| JQ{"jq gate<br/>results &gt; 0?"}
     JQ -.->|yes| NTF["osascript notification"]
 
-    classDef skill fill:#fef3c7,stroke:#f59e0b,stroke-width:2px;
+    classDef skill fill:none,stroke:#f59e0b,stroke-width:3px,stroke-dasharray:5 3;
     class CRON,JQ,NTF skill;
 ```
 
-Amber nodes (`cron`, `jq gate`, `osascript notification`) are shell orchestration configured by [SKILL.md](SKILL.md) Mode 3 — not Python code. The cron line just re-uses `main.py --search` on a schedule and gates the notification on non-empty results.
+Nodes with the dashed amber border (`cron`, `jq gate`, `osascript notification`) are shell orchestration configured by [SKILL.md](SKILL.md) Mode 3 — not Python code. The cron line just re-uses `main.py --search` on a schedule and gates the notification on non-empty results.
 
 ## Modules
 
