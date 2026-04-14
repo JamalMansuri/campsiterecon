@@ -14,6 +14,7 @@ Both output structured JSON consumed by OpenClaw → Telegram.
 flowchart LR
     TG["Telegram"] --> OC["OpenClaw"]
     OC -->|shell exec| CLI["main.py"]
+    CRON["cron<br/>(Mode 3)"] -->|daily, rolling window| CLI
 
     CLI -->|weekend mode| CFG["config.py"]
     CLI -->|search mode| SR["search.py"]
@@ -35,7 +36,15 @@ flowchart LR
 
     CLI -.->|stdout JSON| OC
     OC -.->|reply| TG
+
+    CLI -.->|stdout JSON| JQ{"jq gate<br/>results &gt; 0?"}
+    JQ -.->|yes| NTF["osascript notification"]
+
+    classDef skill fill:#fef3c7,stroke:#f59e0b,stroke-width:2px;
+    class CRON,JQ,NTF skill;
 ```
+
+Amber nodes (`cron`, `jq gate`, `osascript notification`) are shell orchestration configured by [SKILL.md](SKILL.md) Mode 3 — not Python code. The cron line just re-uses `main.py --search` on a schedule and gates the notification on non-empty results.
 
 ## Modules
 
