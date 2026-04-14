@@ -39,17 +39,19 @@ flowchart LR
 
 ## Modules
 
-| File | Responsibility |
-|---|---|
-| [recon/models.py](recon/models.py) | Data contracts — `CampsiteResult`, `WeatherDay`, `LocationReport`, `SearchResult`, `SearchReport` |
-| [recon/config.py](recon/config.py) | Preset location definitions with facility + permit IDs. Add new presets here only |
-| [recon/api_client.py](recon/api_client.py) | HTTP transport. Rec.gov availability endpoints + RIDB facility search. Knows nothing about campsites |
-| [recon/availability.py](recon/availability.py) | Weekend mode: decides which endpoint to call; handles campground → permit fallback |
-| [recon/parser.py](recon/parser.py) | Weekend mode: transforms raw responses into `CampsiteResult`, filters non-bookable, flags contiguous nights |
-| [recon/search.py](recon/search.py) | Search mode: RIDB query → facility list → multi-month availability scan → `SearchReport` |
-| [recon/weather.py](recon/weather.py) | Fetches Fri/Sat/Sun forecast from Open-Meteo. Returns `WeatherDay` per day |
-| [main.py](main.py) | CLI entry point. Routes between weekend + search modes, prints JSON to stdout |
-| [SKILL.md](SKILL.md) | OpenClaw skill definition — copy to `~/.openclaw/skills/campsite-recon/` |
+Each row links to source and to a per-module wiki page. The wiki ([docs/](docs/)) is the curated, navigable layer for LLMs (and devs) who want context without reading every file — start at [docs/README.md](docs/README.md).
+
+| File | Wiki | Responsibility |
+|---|---|---|
+| [main.py](main.py) | [docs/main.md](docs/main.md) | CLI entry point. Loads API key, routes between weekend + search modes, prints JSON to stdout |
+| [recon/api_client.py](recon/api_client.py) | [docs/api_client.md](docs/api_client.md) | HTTP transport. Rec.gov availability endpoints + RIDB facility search. Knows nothing about campsites |
+| [recon/availability.py](recon/availability.py) | [docs/availability.md](docs/availability.md) | Weekend mode: decides which endpoint to call; handles campground → permit fallback |
+| [recon/parser.py](recon/parser.py) | [docs/parser.md](docs/parser.md) | Weekend mode: transforms raw responses into `CampsiteResult`, flags contiguous nights, guards permit URLs |
+| [recon/search.py](recon/search.py) | [docs/search.md](docs/search.md) | Search mode: RIDB query → facility list → multi-month availability scan → `SearchReport` |
+| [recon/weather.py](recon/weather.py) | [docs/weather.md](docs/weather.md) | Fetches Fri/Sat/Sun forecast from Open-Meteo. Returns `WeatherDay` per day |
+| [recon/config.py](recon/config.py) | [docs/config.md](docs/config.md) | Preset location definitions with facility + permit IDs. Add new presets here only |
+| [recon/models.py](recon/models.py) | [docs/models.md](docs/models.md) | Data contracts — `CampsiteResult`, `WeatherDay`, `LocationReport`, `SearchResult`, `SearchReport` |
+| [SKILL.md](SKILL.md) | — | OpenClaw skill definition — copy to `~/.openclaw/skills/campsite-recon/` |
 
 ## Supported preset locations
 

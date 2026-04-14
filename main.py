@@ -91,9 +91,10 @@ def _get_api_key() -> str:
         if key:
             return key
 
-    env = os.environ.get("RIDB_API_KEY", "").strip()
-    if env:
-        return env
+    for var in ("RIDB_API_KEY", "REC_GOV_API_KEY"):
+        env = os.environ.get(var, "").strip()
+        if env:
+            return env
 
     return _HARDCODED_API_KEY_FALLBACK.strip()
 
@@ -136,7 +137,8 @@ def main() -> None:
             "No RIDB API key found. Provide it one of three ways: "
             "(1) macOS Keychain — security add-generic-password -a $USER -s recreation-gov-api -w <KEY>; "
             "(2) Windows Credential Manager — cmdkey /generic:recreation-gov-api /user:rec /pass:<KEY>; "
-            "(3) edit _HARDCODED_API_KEY_FALLBACK in main.py. "
+            "(3) env var RIDB_API_KEY or REC_GOV_API_KEY; "
+            "(4) edit _HARDCODED_API_KEY_FALLBACK in main.py. "
             "Get a key at ridb.recreation.gov/profile."
         )}))
         sys.exit(1)

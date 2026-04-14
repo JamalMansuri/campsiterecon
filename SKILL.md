@@ -1,10 +1,12 @@
 ---
 name: campsite-recon
 description: >
-  Check campsite and wilderness permit availability. Two modes: preset
-  Bay Area weekend scan (with weather), or free-text search of any
-  location over a specific date range. Use when the user mentions
-  camping, open sites, wilderness permits, or a weekend trip.
+  Check campsite and wilderness permit availability. Three modes: preset
+  Bay Area weekend scan (with weather), free-text search of any location
+  over a specific date range, or a recurring watch that notifies only
+  when sites open. Use when the user mentions camping, open sites,
+  wilderness permits, a weekend trip, or asks to keep checking / be
+  notified.
 metadata:
   openclaw:
     emoji: "🏕"
@@ -16,7 +18,7 @@ metadata:
 
 ## API key — handling the "no key found" error
 
-`main.py` looks up the RIDB key in this order: macOS Keychain → Windows Credential Manager → `RIDB_API_KEY` env var → hardcoded constant `_HARDCODED_API_KEY_FALLBACK` in `main.py`. If all four are empty it returns a JSON error and exits 1.
+`main.py` looks up the RIDB key in this order: macOS Keychain → Windows Credential Manager → `RIDB_API_KEY` or `REC_GOV_API_KEY` env var → hardcoded constant `_HARDCODED_API_KEY_FALLBACK` in `main.py`. If all are empty it returns a JSON error and exits 1.
 
 **If you (the LLM) see that error, do not run any commands until you've asked the user which platform they're on and walked them through one of these.** The user may not be a developer — pick the easiest option for their OS, ask them to paste their key once, and run the command for them.
 
@@ -32,10 +34,10 @@ metadata:
   ```
   Verify: `cmdkey /list:recreation-gov-api`. The Python loader reads it via `advapi32.CredReadW`, no extra deps.
 
-- **Any OS, quickest** — env var for the current shell only:
+- **Any OS, quickest** — env var for the current shell only. Either name works:
   ```
-  export RIDB_API_KEY='<KEY>'   # macOS/Linux
-  setx RIDB_API_KEY "<KEY>"     # Windows (new shells only)
+  export RIDB_API_KEY='<KEY>'        # macOS/Linux  (or REC_GOV_API_KEY)
+  setx RIDB_API_KEY "<KEY>"          # Windows, new shells only  (or REC_GOV_API_KEY)
   ```
 
 - **Last resort, non-developers** — open `main.py`, find `_HARDCODED_API_KEY_FALLBACK = ""`, paste the key between the quotes. Warn the user **not to commit the file** after doing this; suggest `git update-index --skip-worktree main.py` if they're version-controlling.
@@ -51,7 +53,7 @@ When this skill is invoked, your **first** response must be exactly these three 
 > Which do you want?
 >
 > **1.** All preconfigured Bay Area campsites/permits for this coming weekend (with weather).
-> **2.** A specific location and date range — I'll return every open campground as a table.
+> **2.** A specific location and date range — I'll return every open campground as a clean list.
 > **3.** Watch a location on a recurring schedule (daily cron, notifies only when sites open).
 >
 > Reply `1`, `2`, or `3` (or just tell me the location + dates).
@@ -82,14 +84,14 @@ Only pass `--date YYYY-MM-DD` if the user asked for a weekend other than "this w
 
 **Present as:**
 - Lead with what's open. Star ⭐ contiguous sites.
-- Permit sites (`permit_required: true`) — use `/permits/{id}` URLs, not `/camping/`.
-- Show the 3-day weather after the availability list for each location.
+- **First reply: clean availability only — no booking links per line.** Show the 3-day weather after the availability list for each location.
+- If the user asks for links, follow with a separate compact `Booking links:` section. Permit sites (`permit_required: true`) must use `/permits/{id}` URLs, not `/camping/`.
 - If nothing is open anywhere, say so and still show weather.
 
 Example:
 ```
-⭐ Coast Camp — Fri+Sat+Sun → recreation.gov/permits/4675311
-   Pfeiffer Big Sur — Sat only → recreation.gov/camping/campgrounds/233394
+⭐ Coast Camp — Fri+Sat+Sun
+   Pfeiffer Big Sur — Sat only
 
 🌤 Point Reyes
 Fri: 16°C / 8°C · Overcast
