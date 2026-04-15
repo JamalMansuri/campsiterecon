@@ -1,10 +1,29 @@
-# Campsite Recon
+# Campsite Recon — Recreation.gov availability CLI + OpenClaw skill
 
-Two modes:
-1. **Weekend recon** — preset Bay Area locations, upcoming weekend, with weather (Recreation.gov + Open-Meteo).
-2. **Free-text search** — any location (e.g. "Yosemite") over an arbitrary date range, no weather. For planning trips months ahead.
+A small Python CLI and OpenClaw skill that checks **Recreation.gov campsite and wilderness-permit availability** for any US campground, pairs it with a Fri/Sat/Sun weather forecast, and surfaces openings in Telegram. Built on the public RIDB directory API plus Recreation.gov's internal availability endpoints, with a cron watch mode that notifies you only when sites actually open.
 
-Both output structured JSON consumed by OpenClaw → Telegram.
+**Three modes:**
+
+1. **Weekend recon** — preset Bay Area / Central California locations (Point Reyes wilderness permits, Big Sur, Pinnacles, Kings Canyon, Sequoia) for the upcoming weekend, with weather (Recreation.gov + Open-Meteo).
+2. **Free-text search** — any location (e.g. "Yosemite", "Tahoe", "Joshua Tree", "Zion") over an arbitrary date range, no weather. For planning trips months ahead.
+3. **Watch (cron)** — daily check of a specific location with a rolling date window. Notifies only when sites open; silent otherwise. Full install walkthrough in [SKILL.md](SKILL.md) Mode 3.
+
+All three output structured JSON consumed by OpenClaw → Telegram.
+
+## What it answers
+
+Typical queries, phrased how a user would actually type them:
+
+- "Any campsites open in Point Reyes this weekend?"
+- "Find me an open Yosemite campground over July 4th"
+- "Check Big Sur next weekend and tell me the weather"
+- "Watch Sequoia daily and ping me when a site opens up"
+- "Are wilderness permits available for Coast Camp?"
+- "Is Kirk Creek bookable Sat+Sun?"
+
+If you're looking to monitor Recreation.gov availability from the command line — or to drop that ability into an LLM agent loop (OpenClaw, Claude Code, any shell-capable agent) and pipe the results into Telegram — this repo is the minimum viable version.
+
+Recreation.gov has no public POST/PATCH endpoints, so **this tool cannot book sites for you**. It's read-only surveillance: poll availability, surface openings, let the human click through to book. Their iOS app has a native watch feature; this CLI replicates that inside an LLM/Telegram workflow so the same loop can handle free-text queries, cron polling, and weather in one place.
 
 ---
 
@@ -101,7 +120,21 @@ python main.py --search "Yosemite" --start 2026-07-03 --end 2026-07-05
 python main.py --search "Tahoe" --start 2026-07-30 --end 2026-08-02
 ```
 
-Search mode only hits the campground endpoint — wilderness-permit-only facilities (Point Reyes pattern) are skipped. For those, use a preset.
+Search mode only hits the Recreation.gov campground endpoint — wilderness-permit-only facilities (Point Reyes pattern) are skipped. For those, use a preset.
+
+**Watch mode** — cron-driven notifications, only when sites open:
+
+Mode 3 is orchestration rather than a new CLI flag. You wrap the search-mode command in a crontab line that gates notifications on non-empty results with `jq`, so you never see "nothing available" noise — you only hear from it when a site actually opens. Install walkthrough lives in [SKILL.md](SKILL.md) Mode 3; short version:
+
+```bash
+# Daily at 8am, scan the next 30 days for Yosemite, notify only when results[] is non-empty
+0 8 * * * cd /path/to/campsitescout && /usr/bin/env python3 main.py --search "Yosemite" \
+  --start $(date -v+1d +\%Y-\%m-\%d) --end $(date -v+30d +\%Y-\%m-\%d) \
+  | /opt/homebrew/bin/jq -e '.results | length > 0' >/dev/null \
+  && osascript -e 'display notification "Open sites for Yosemite" with title "🏕 Campsite Scout"'
+```
+
+Swap `osascript` for a `curl` to a Telegram bot's `sendMessage` endpoint to route notifications into chat instead of a macOS banner. Cron only fires while the machine is awake — for 24/7 watching, host this on a server or GitHub Actions.
 
 ## OpenClaw setup
 
