@@ -1,9 +1,10 @@
 from datetime import date, timedelta
 from .config import Camp
-from .models import CampsiteResult
+from .models import CampsiteResult, RawCampgroundResponse, is_available
+from .windows import consecutive_nights
 
-_OPEN     = {"Available", "Open"}
 _REC_BASE = "https://www.recreation.gov"
+_WEEKEND_NIGHTS = 2
 
 
 def _reservation_url(camp: Camp) -> str:
@@ -19,36 +20,44 @@ def _weekend_dates(friday: date) -> set[date]:
     return {friday, friday + timedelta(1), friday + timedelta(2)}
 
 
-def _is_contiguous(available: set[date], friday: date) -> bool:
-    """True if available for at least 2 consecutive nights of the weekend."""
-    sat = friday + timedelta(1)
-    sun = friday + timedelta(2)
-    return (friday in available and sat in available) or (sat in available and sun in available)
+def _serialize_windows(windows: list[tuple[date, date]]) -> list[tuple[str, str]]:
+    return [(s.isoformat(), e.isoformat()) for s, e in windows]
 
 
 def _parse_campground(raw: dict, camp: Camp, friday: date) -> CampsiteResult:
-    targets   = _weekend_dates(friday)
-    available: set[date] = set()
+    response                       = RawCampgroundResponse.model_validate(raw)
+    targets                        = _weekend_dates(friday)
+    flat:    set[date]             = set()
+    by_site: dict[str, set[date]]  = {}
 
-    for site in raw.get("campsites", {}).values():
-        for dt_str, status in site.get("availabilities", {}).items():
-            if status not in _OPEN:
+    for campsite_id, site in response.campsites.items():
+        for dt_str, status in site.availabilities.items():
+            if not is_available(status):
                 continue
             try:
                 d = date.fromisoformat(dt_str[:10])
             except ValueError:
                 continue
-            if d in targets:
-                available.add(d)
+            if d not in targets:
+                continue
+            flat.add(d)
+            by_site.setdefault(campsite_id, set()).add(d)
 
-    sorted_dates = sorted(d.isoformat() for d in available)
+    windows_by_site = {
+        sid: _serialize_windows(consecutive_nights(dates, _WEEKEND_NIGHTS))
+        for sid, dates in by_site.items()
+    }
+    windows_by_site = {sid: ws for sid, ws in windows_by_site.items() if ws}
+
     return CampsiteResult(
-        name            = camp.name,
-        facility_id     = camp.facility_id,
-        available_dates = sorted_dates,
-        permit_required = camp.permit_id is not None,
-        reservation_url = _reservation_url(camp),
-        contiguous      = _is_contiguous(available, friday),
+        name               = camp.name,
+        facility_id        = camp.facility_id,
+        available_dates    = sorted(d.isoformat() for d in flat),
+        sites_by_id        = {sid: sorted(d.isoformat() for d in dates) for sid, dates in by_site.items()},
+        windows_by_site_id = windows_by_site,
+        permit_required    = camp.permit_id is not None,
+        reservation_url    = _reservation_url(camp),
+        contiguous         = bool(consecutive_nights(flat, _WEEKEND_NIGHTS)),
     )
 
 
@@ -75,7 +84,7 @@ def _parse_permit(raw: dict, camp: Camp, friday: date) -> CampsiteResult:
         available_dates = sorted_dates,
         permit_required = True,
         reservation_url = _reservation_url(camp),
-        contiguous      = _is_contiguous(available, friday),
+        contiguous      = bool(consecutive_nights(available, _WEEKEND_NIGHTS)),
     )
 
 

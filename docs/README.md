@@ -36,9 +36,19 @@ Telegram → OpenClaw → main.py
 | [availability.md](availability.md) | Weekend-mode dispatcher. Tries campground endpoint, falls back to permit |
 | [parser.md](parser.md) | Weekend-mode normalizer. Turns raw API JSON into `CampsiteResult` |
 | [search.md](search.md) | Free-text search mode. RIDB lookup + multi-month availability scan |
+| [windows.md](windows.md) | Pure date-math primitive. Enumerates viable N-night `(start, checkout)` windows |
+| [booker.md](booker.md) | Auto-cart Phase 1+. Playwright session manager — `login`, `health`, soon `cart` |
 | [weather.md](weather.md) | Open-Meteo Fri/Sat/Sun forecast. Weekend mode only |
 | [config.md](config.md) | Hardcoded preset locations + facility/permit IDs |
-| [models.md](models.md) | Dataclasses that define every JSON shape the program emits |
+| [models.md](models.md) | Pydantic models that define every JSON shape the program emits |
+
+## Attribution & prior art
+
+| Page | What it covers |
+|---|---|
+| [camply-attribution.md](camply-attribution.md) | Borrowed: `RawCampgroundResponse`/`RawSiteAvailability` shapes + the unavailable-status denylist. No runtime dep |
+| [banool-attribution.md](banool-attribution.md) | Borrowed: the `consecutive_nights` algorithm powering [windows.md](windows.md). No runtime dep |
+| [auto-cart-mvp-plan.md](auto-cart-mvp-plan.md) | The Playwright auto-cart MVP plan + Phase tracker |
 
 ## Where to start by question
 

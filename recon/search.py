@@ -1,9 +1,10 @@
 from datetime import date, timedelta
 from .api_client import RecGovClient
-from .models import SearchResult, SearchReport
+from .models import RawCampgroundResponse, SearchResult, SearchReport, is_available
+from .windows import consecutive_nights
 
-_OPEN     = {"Available", "Open"}
 _REC_BASE = "https://www.recreation.gov"
+_SEARCH_NIGHTS = 2
 
 
 def _date_range(start: date, end: date) -> set[date]:
@@ -23,16 +24,12 @@ def _months_spanned(start: date, end: date) -> list[tuple[int, int]]:
     return out
 
 
-def _has_contiguous(dates: set[date]) -> bool:
-    """True if the set contains at least one pair of consecutive days."""
-    return any((d + timedelta(1)) in dates for d in dates)
-
-
 def _open_dates_in_range(raw: dict, targets: set[date]) -> set[date]:
+    response = RawCampgroundResponse.model_validate(raw)
     hits: set[date] = set()
-    for site in raw.get("campsites", {}).values():
-        for dt_str, status in site.get("availabilities", {}).items():
-            if status not in _OPEN:
+    for site in response.campsites.values():
+        for dt_str, status in site.availabilities.items():
+            if not is_available(status):
                 continue
             try:
                 d = date.fromisoformat(dt_str[:10])
@@ -68,7 +65,7 @@ def search(client: RecGovClient, query: str, start: date, end: date, limit: int 
             facility_id     = facility_id,
             available_dates = sorted(d.isoformat() for d in open_dates),
             reservation_url = f"{_REC_BASE}/camping/campgrounds/{facility_id}",
-            contiguous      = _has_contiguous(open_dates),
+            contiguous      = bool(consecutive_nights(open_dates, _SEARCH_NIGHTS)),
         ))
 
     return SearchReport(

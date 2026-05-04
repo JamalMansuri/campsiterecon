@@ -21,14 +21,15 @@ Returns a `SearchReport` (see [models.md](models.md)) with a `results[]` array. 
 5. **Drop facilities with zero open dates.** Empty results don't pollute the output.
 6. **Emit a `SearchResult` per surviving facility** with the merged dates, a reservation URL, and a `contiguous` flag.
 
-## `contiguous` is looser than weekend mode
+## `contiguous` reuses the same primitive as weekend mode
 
 ```python
-def _has_contiguous(dates):
-    return any((d + timedelta(1)) in dates for d in dates)
+contiguous = bool(consecutive_nights(open_dates, nights=2))
 ```
 
-Any two consecutive days anywhere in the open set counts. Weekend mode (in [parser.md](parser.md)) is stricter — it specifically wants Fri+Sat or Sat+Sun. The looser definition makes sense for search because the user is planning around their own date range, not the calendar weekend.
+Powered by [`consecutive_nights()`](windows.md) — same function the parser uses, just operating on the merged facility-level date set instead of per-site sets. Search mode does **not** populate per-site windows (sites_by_id is dropped during the per-site merge in `_open_dates_in_range`). If per-site windows are needed for search-mode results, the merge step would have to be refactored to preserve `campsite_id` first.
+
+The "any two consecutive days in the queried range" semantic is unchanged from before; the implementation is just cleaner now and the function generalizes to N nights for the future auto-cart matcher.
 
 ## What search mode deliberately does NOT do
 

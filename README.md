@@ -76,6 +76,7 @@ Each row links to source and to a per-module wiki page. The wiki ([docs/](docs/)
 | [recon/availability.py](recon/availability.py) | [docs/availability.md](docs/availability.md) | Weekend mode: decides which endpoint to call; handles campground → permit fallback |
 | [recon/parser.py](recon/parser.py) | [docs/parser.md](docs/parser.md) | Weekend mode: transforms raw responses into `CampsiteResult`, flags contiguous nights, guards permit URLs |
 | [recon/search.py](recon/search.py) | [docs/search.md](docs/search.md) | Search mode: RIDB query → facility list → multi-month availability scan → `SearchReport` |
+| [recon/windows.py](recon/windows.py) | [docs/windows.md](docs/windows.md) | Pure date primitive — enumerates viable N-night `(start, checkout)` windows. Used by parser, search, and the future auto-cart matcher |
 | [recon/weather.py](recon/weather.py) | [docs/weather.md](docs/weather.md) | Fetches Fri/Sat/Sun forecast from Open-Meteo. Returns `WeatherDay` per day |
 | [recon/config.py](recon/config.py) | [docs/config.md](docs/config.md) | Preset location definitions with facility + permit IDs. Add new presets here only |
 | [recon/models.py](recon/models.py) | [docs/models.md](docs/models.md) | Data contracts — `CampsiteResult`, `WeatherDay`, `LocationReport`, `SearchResult`, `SearchReport` |

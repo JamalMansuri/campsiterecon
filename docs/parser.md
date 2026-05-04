@@ -16,12 +16,20 @@ def parse(response: dict, camp: Camp, friday: date) -> CampsiteResult
 
 Rec.gov returns campground availability and permit availability in completely different JSON shapes. The parser handles both:
 
-| Endpoint | Path through JSON | Open value |
+| Endpoint | Path through JSON | Open test |
 |---|---|---|
-| Campground | `campsites[*].availabilities[date]` | `"Available"` or `"Open"` |
+| Campground | `campsites[campsite_id].availabilities[date]` | `is_available(status)` (denylist) |
 | Permit | `payload.availability[date].remaining` | integer `> 0` |
 
-The output `CampsiteResult` is identical for both.
+For campgrounds, the parser validates the raw response against [`RawCampgroundResponse`](models.md) at the boundary, then iterates `response.campsites.items()` to preserve the outer `campsite_id` key (used by the auto-cart booker). For permits, the per-site dimension doesn't exist — `sites_by_id` and `windows_by_site_id` stay empty.
+
+The output `CampsiteResult` shape is identical for both.
+
+## Filtering: denylist, not allowlist
+
+`is_available(status)` (defined in [models.md](models.md)) returns `False` for the full Rec.gov denylist: `Reserved`, `Not Available`, `Not Reservable`, `Not Reservable Management`, `Not Available Cutoff`, `Lottery`, `Open`, `NYR`, `Closed`.
+
+**`"Open"` is in the denylist on purpose.** It means the campground is open for the season but the site itself is walk-up-only. Treating it as available used to cause false positives. See [camply-attribution.md](camply-attribution.md).
 
 ## The permit URL gotcha
 
@@ -37,11 +45,16 @@ This matters because Rec.gov sometimes serves Point Reyes data through the campg
 
 This is the one rule a future LLM is most likely to break when refactoring. Don't.
 
-## Contiguous detection
+## Contiguous detection + per-site windows
 
-`_is_contiguous(available, friday)` returns `True` if the camp has at least 2 consecutive nights of the weekend open — Fri+Sat **or** Sat+Sun. Sat+Sun counts because most weekenders care about getting two nights, not which two.
+Both the `contiguous` flag and the new `windows_by_site_id` field are powered by [`consecutive_nights()`](windows.md), with `nights=2` for weekend mode:
 
-Search mode has a looser definition (any two consecutive days in the date range, not just weekend pairs). See [search.md](search.md).
+- `contiguous` — `bool(consecutive_nights(flat, 2))`. True if any 2 adjacent nights exist anywhere in the Fri/Sat/Sun window. Replaces the prior hardcoded "Fri+Sat or Sat+Sun" check.
+- `windows_by_site_id` — for each campsite with at least one viable 2-night window, the list of `(start, checkout)` ISO date pairs. Empty for sites with only single-night availability. This is the field the Phase 3 auto-cart matcher will read.
+
+The algorithm comes from banool — see [banool-attribution.md](banool-attribution.md). The function generalizes to arbitrary `nights`, so the matcher can call it directly with values from `targets.json`.
+
+Search mode also uses `consecutive_nights`, but with looser inputs (full search range, not weekend window) and without per-site detail (search merges across sites). See [search.md](search.md).
 
 ## Upstream / downstream
 

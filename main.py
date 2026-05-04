@@ -3,7 +3,6 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import asdict
 from datetime import date, timedelta
 
 from recon.api_client import RecGovClient
@@ -14,12 +13,8 @@ from recon.parser import parse
 from recon.search import search
 from recon.weather import fetch_weekend_weather
 
-
-# Last-resort fallback for users who can't (or don't want to) use OS secret storage.
-# Paste your RIDB key between the quotes. Leave empty otherwise — Keychain / Credential
-# Manager / RIDB_API_KEY env var are all checked first.
-_HARDCODED_API_KEY_FALLBACK = ""
-
+# Fallback API key for users who edit the script directly. Not recommended.
+_HARDCODED_API_KEY_FALLBACK = " "
 
 def _keychain_macos() -> str:
     user = os.environ.get("USER", "")
@@ -152,12 +147,12 @@ def main() -> None:
         start  = date.fromisoformat(args.start)
         end    = date.fromisoformat(args.end)
         report = search(client, args.search, start, end)
-        print(json.dumps(asdict(report), indent=2))
+        print(json.dumps(report.model_dump(mode="json"), indent=2))
         return
 
     friday    = date.fromisoformat(args.date) if args.date else _upcoming_friday()
     locations = [LOCATIONS[args.location]] if args.location else list(LOCATIONS.values())
-    reports   = [asdict(_run_location(loc, client, friday)) for loc in locations]
+    reports   = [_run_location(loc, client, friday).model_dump(mode="json") for loc in locations]
 
     print(json.dumps(reports, indent=2))
 
