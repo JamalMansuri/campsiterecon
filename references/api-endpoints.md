@@ -20,8 +20,8 @@ GET /facilities
 | `longitude` | float | Center point for geo search |
 | `radius` | float | Miles from lat/lon (default 25) |
 | `facilitytype` | string | `"Campground"` to filter |
-| `limit` | int | Max results (default 50, max 50) |
-| `offset` | int | Pagination |
+| `limit` | int | Max results per page (default 50, **max 50**) |
+| `offset` | int | Pagination — walk it until `METADATA.RESULTS.TOTAL_COUNT`; "Yosemite" has 43 matches and the Valley campgrounds are on page 2 |
 | `apikey` | string | Your API key |
 
 **Response:**
@@ -29,14 +29,15 @@ GET /facilities
 {
   "RECDATA": [
     {
-      "FacilityID": "234059",
-      "FacilityName": "SKY CAMP",
-      "FacilityLatitude": 38.0371,
-      "FacilityLongitude": -122.8027,
+      "FacilityID": "233359",
+      "FacilityName": "Point Reyes National Seashore Campground",
+      "FacilityLatitude": 38.04121,
+      "FacilityLongitude": -122.800354,
       "FacilityTypeDescription": "Campground",
-      "FacilityDescription": "...",
-      "FacilityPhone": "...",
-      "RECAREA": [{"RecAreaName": "Point Reyes National Seashore"}]
+      "Reservable": true,
+      "Enabled": true,
+      "ParentRecAreaID": "2864",
+      "RECAREA": []
     }
   ],
   "METADATA": {
@@ -85,7 +86,7 @@ Returns individual site metadata (loop name, site type, max occupancy). Not need
 > **Unofficial API** — no documented key, but publicly accessible and widely used by third-party checkers. Be respectful with request rates.
 
 **Base URL:** `https://www.recreation.gov/api/camps/availability/campground`
-**Headers:** Always include `User-Agent: CampsiteScout/1.0`
+**Headers:** Always include `User-Agent: CampsiteRecon/1.0` (what `recon/api_client.py` sends)
 **No API key required.**
 
 ### Get Monthly Availability
@@ -119,21 +120,32 @@ The `start_date` must be the **first of a month** in ISO format. To check availa
 }
 ```
 
-**Availability status values:**
+**Availability status values** (full list + rationale in `api-response-shapes.md`):
 
 | Status | Meaning |
 |--------|---------|
 | `Available` | ✅ Open to book |
-| `Open` | ✅ Open to book (walk-up or first-come-first-served) |
+| `Open` | ❌ Walk-up / first-come only — **not** bookable online (camply denylist) |
 | `Reserved` | ❌ Already booked |
 | `Not Available` | ❌ Closed / not offered |
-| `Not Reservable` | ❌ Cannot be reserved online (may be walk-up only) |
+| `Not Reservable` | ❌ Cannot be reserved online |
 | `Not Reservable Management` | ❌ Held by park staff |
-| `Open (2 of 2)` | ✅ Group site with quantity — parse the number |
+| `NYR` | ❌ Not yet released (outside the booking window) |
+| `Closed`, `Lottery`, `Not Available Cutoff` | ❌ |
+
+**A wrong facility id still returns a 200 with a full `campsites` payload.** Confirm ids with the metadata endpoint below before trusting them.
+
+### Campground metadata
+
+```
+GET https://www.recreation.gov/api/camps/campgrounds/{facilityId}
+```
+
+No key. Returns `{"campground": {"facility_name": ..., "facility_latitude": ..., "facility_longitude": ..., "parent_asset_id": ...}}`; 404 for unknown ids. Used for `official_name` in output and by `main.py --verify`.
 
 ### Wilderness Permit Availability
 
-For backcountry / wilderness permit campgrounds (common at Point Reyes), the endpoint is different:
+For backcountry / wilderness permits (Yosemite Wilderness, Half Dome), the endpoint is different:
 
 ```
 GET https://www.recreation.gov/api/permits/{permitId}/availability/month
@@ -141,14 +153,11 @@ GET https://www.recreation.gov/api/permits/{permitId}/availability/month
   &commercial_acct=false
 ```
 
-Permit IDs for Point Reyes wilderness are listed in `facility-ids.md`. The response structure is similar but keyed by entry point / zone rather than campsite.
+The response is `payload.availability[division_id].date_availability[date].{total, remaining}` — keyed by division (entry point / zone), dates nested inside. **Point Reyes is not a permit** — it is campground 233359 with loops; see `facility-ids.md`. Genuine permits: Yosemite Wilderness `445859`, Half Dome `234652`.
 
 ### Rate Limiting
 
-There's no published rate limit, but be conservative:
-- Don't hammer more than 1 request/second
-- Cache results within the same session — don't re-fetch the same month twice
-- For multi-month windows, make sequential calls with a brief pause
+Observed 2026-09-20: the availability endpoints return **HTTP 429** (CloudFront, no `Retry-After`) after a burst of roughly 60+ requests in a minute, and stay blocked for a few minutes. `RecGovClient` paces availability calls at 0.6 s, caches per run, trips a breaker on the FIRST 429 (retrying only extends the block) and writes a 10-minute cooldown to `~/.campsitescout/rate_limit.json` that later runs honour. Don't run several scans in parallel from one IP.
 
 ---
 
@@ -164,9 +173,9 @@ GET https://api.open-meteo.com/v1/forecast
   ?latitude={lat}
   &longitude={lon}
   &daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max
-  &temperature_unit=fahrenheit
-  &wind_speed_unit=mph
-  &precipitation_unit=inch
+  &temperature_unit=celsius
+  &wind_speed_unit=kmh
+  &precipitation_unit=mm
   &timezone=auto
   &forecast_days=14
 ```
@@ -180,10 +189,10 @@ GET https://api.open-meteo.com/v1/forecast
   "daily": {
     "time": ["2026-05-17", "2026-05-18", ...],
     "weathercode": [1, 3, 61, ...],
-    "temperature_2m_max": [68.2, 72.1, 58.4, ...],
-    "temperature_2m_min": [51.8, 54.3, 47.2, ...],
-    "precipitation_sum": [0.0, 0.0, 0.42, ...],
-    "windspeed_10m_max": [12.3, 8.7, 18.2, ...]
+    "temperature_2m_max": [20.1, 22.3, 14.7, ...],
+    "temperature_2m_min": [11.0, 12.4, 8.4, ...],
+    "precipitation_sum": [0.0, 0.0, 10.7, ...],
+    "windspeed_10m_max": [19.8, 14.0, 29.3, ...]
   }
 }
 ```
@@ -208,8 +217,8 @@ GET https://api.open-meteo.com/v1/forecast
 
 ### High Wind Flag
 
-Wind over **25 mph** is worth flagging for camping — mention it in the output:
-`💨 Winds up to {X} mph — exposed sites may be rough`
+Wind over **25 kph** (`wind_kph` in the output) is worth flagging for camping — mention it in the reply:
+`💨 Winds up to {X} km/h — exposed sites may be rough`
 
 ---
 
@@ -220,6 +229,7 @@ Use these URL patterns to generate booking links:
 | Type | URL Pattern |
 |------|-------------|
 | Campground page | `https://www.recreation.gov/camping/campgrounds/{facilityId}` |
-| Campground availability calendar | `https://www.recreation.gov/camping/campgrounds/{facilityId}/availability` |
 | Permit page | `https://www.recreation.gov/permits/{permitId}` |
 | Specific campsite | `https://www.recreation.gov/camping/campsites/{campsiteId}` |
+
+(`/availability` redirects to the plain campground page; the three patterns above are the ones `recon/parser.py` emits, and the only ones the runtime LLM may use.)

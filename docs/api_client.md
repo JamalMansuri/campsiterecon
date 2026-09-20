@@ -1,6 +1,6 @@
 # recon/api_client.py
 
-The only module in the program that talks HTTP. Wraps three Recreation.gov endpoints behind a single class. Knows nothing about campsites, dates, or business logic — that's all in callers.
+The only module in the program that talks HTTP. Wraps Recreation.gov and RIDB behind a single class. Knows nothing about campsites, dates, or business logic — that's all in callers.
 
 [Source](../recon/api_client.py) · Wiki home: [README.md](README.md)
 
@@ -8,47 +8,55 @@ The only module in the program that talks HTTP. Wraps three Recreation.gov endpo
 
 ```python
 class RecGovClient:
-    def __init__(self, api_key: str)
+    def __init__(self, api_key: str | None, debug: bool | None = None, cooldown_file=~/.campsitescout/rate_limit.json)
+    rate_limited: bool                      # True after a 429 this run, or while a recent run's cooldown is active
+    rate_limited_until: datetime | None
+    errors: dict[str, str]                  # redacted url -> "HTTP 404" / "TimeoutError: ..." for every failed fetch
+    def error_for(facility_or_permit_id) -> str | None
     def campground_month(facility_id, year, month) -> dict | None
     def permit_month(permit_id, year, month) -> dict | None
-    def ridb_search_campgrounds(query, limit=50) -> list[dict]
+    def campground_meta(facility_id) -> dict | None            # /api/camps/campgrounds/{id}
+    def ridb_facility(facility_id) -> dict | None              # RIDB /facilities/{id}
+    def ridb_recarea_name(rec_area_id) -> str | None           # RIDB /recareas/{id}
+    def ridb_search_campgrounds(query, max_results=150) -> tuple[list[dict], int]
 ```
 
-All three methods return `None` / `[]` on any HTTPError, URLError, or JSON decode failure. Callers must handle empty results, never network errors.
+Every method returns `None` / `[]` on any HTTPError, URLError, or JSON decode failure. Callers must handle empty results, never network errors — but they must *report* them (`unreachable[]`, `warnings[]`).
 
-## The three endpoints
+## Endpoints
 
 | Method | Host | Auth | Used by |
 |---|---|---|---|
-| `campground_month` | `recreation.gov/api/camps/availability/campground/{id}/month` | None (User-Agent header only) | [availability.md](availability.md), [search.md](search.md) |
-| `permit_month` | `recreation.gov/api/permits/{id}/availability/month` | None (User-Agent header only) | [availability.md](availability.md) |
-| `ridb_search_campgrounds` | `ridb.recreation.gov/api/v1/facilities` | API key in querystring | [search.md](search.md) |
+| `campground_month` | `recreation.gov/api/camps/availability/campground/{id}/month` | User-Agent only | [availability.md](availability.md), [search.md](search.md), [verify.md](verify.md) |
+| `permit_month` | `recreation.gov/api/permits/{id}/availability/month` | User-Agent only | [availability.md](availability.md) |
+| `campground_meta` | `recreation.gov/api/camps/campgrounds/{id}` | User-Agent only | availability + search (official names, `facility_rules` → `stay_rules`), verify |
+| `ridb_facility`, `ridb_recarea_name`, `ridb_search_campgrounds` | `ridb.recreation.gov/api/v1/...` | `apikey` query param | search, verify |
 
-## Why two different APIs
+## Caching
 
-Recreation.gov runs two separate systems:
+Responses are memoised per client instance by URL. Point Reyes' four loop presets fetch one month once; search mode's rec-area lookups cost one request per distinct rec area; `--verify` doesn't refetch what the run already has. A rate-limited skip is *not* cached so the next run retries.
 
-- **RIDB** (`ridb.recreation.gov`) is the public facility *directory*. Stable, search-friendly, rate-limited, requires an API key. Used to resolve a free-text name → facility ID. No availability data.
-- **Rec.gov** (`recreation.gov/api/...`) is the live booking engine. Returns per-day availability. No key required, but expects a real `User-Agent` (we send `CampsiteRecon/1.0`). Internal API; can change without notice.
+## Rate limiting (HTTP 429)
 
-Search mode needs both: RIDB to find facilities by name, Rec.gov to check if any of them are bookable. Weekend mode skips RIDB because preset facility IDs are hardcoded in [config.md](config.md).
+Rec.gov's availability endpoints answer `429` from CloudFront (empty body, no `Retry-After`) when polled in a burst. Measured 2026-09-20: the block is **per-IP**, lasts about six minutes of complete silence, and every request made while blocked restarts the clock — so retrying is always wrong. The client:
 
-## Failure model
+1. paces availability requests (`_PACE_SECONDS = 0.6`);
+2. on the **first** 429 sets `rate_limited = True`, returns `None` for every further availability request this run without touching the network, and writes `{"blocked_until": <now+10 min>}` to `~/.campsitescout/rate_limit.json`;
+3. a later client (next cron tick, the LLM "trying again") reads that file at construction and starts already `rate_limited` until the timestamp passes.
 
-Every method wraps `urlopen` in a try/except over `(HTTPError, URLError, JSONDecodeError)` and returns the empty case. This is deliberate:
+Metadata and RIDB calls are unaffected by the breaker. Callers turn `rate_limited` / `rate_limited_until` into a `warnings[]` line via `search.rate_limit_warning()`, which names the time before which retrying is pointless.
 
-- A missing facility (`404`) is functionally the same as "no campsites available" from the caller's perspective.
-- A network blip during a multi-month scan in [search.md](search.md) shouldn't kill the entire search — that one facility just contributes nothing.
-- The CLI is one-shot; there's no retry loop. If the result is empty, the user re-runs.
+## Failure visibility
 
-The cost is that genuine bugs (bad URL construction, wrong header) look identical to "no results." When debugging, drop a `print(e)` into `_get`.
+`_fetch` catches `HTTPError`, `OSError` (URLError, timeouts, resets), `http.client.HTTPException` (truncated bodies) and `ValueError` (bad JSON / bad UTF-8) — a read-phase timeout used to escape and kill the whole run — and rejects non-object JSON bodies. Site-level validation in [parser.md](parser.md) (`validate_campground`) skips and counts malformed campsite records instead of raising. The cooldown file is read inside a try (a naive timestamp is treated as UTC; anything unreadable means no cooldown) and its directory is created `0700`. Every failure is recorded in `errors` and `error_for(id)` lets callers say *why* a facility is unreachable (`HTTP 404` → the id is wrong; `HTTP 400` → date out of range). `debug=True` (or `--debug`, or `CAMPSITESCOUT_DEBUG=1`) also prints them to stderr as `[api_client] HTTP 429 <url-without-key>`.
 
-## SSL
+## Pagination + filtering in `ridb_search_campgrounds`
 
-Uses `certifi.where()` for the trust store, not the system default — avoids macOS python3 SSL flakiness on fresh installs. This is the only reason `certifi` is in [../requirements.txt](../requirements.txt).
+RIDB pages at 50 and `facilitytype=Campground` is only a hint (Permit / Timed Entry / Visitor Center records still come back). The method walks `offset` until `METADATA.RESULTS.TOTAL_COUNT` (capped at `max_results`), keeping only `FacilityTypeDescription == "Campground"` and `Reservable` and `Enabled`. Returns `(records, total_count)`.
 
 ## Gotchas
 
-- The `start_date` query param must be ISO-8601 with `T00:00:00.000Z` and the day pinned to `01`. Other formats silently return empty.
-- `User-Agent` is required on `recreation.gov/api/...` — without it you get a Cloudflare challenge page that decodes as garbage and trips the JSON parser.
-- The `apikey` query param is RIDB-only. Passing it to `recreation.gov/api/...` is harmless but wastes a key.
+- `start_date` must be ISO-8601 with `T00%3A00%3A00.000Z` (colons encoded) and the day pinned to `01`.
+- `User-Agent` is required on `recreation.gov/api/...`; a `python-requests/*` UA gets a CloudFront 403 HTML page. Ours is `CampsiteRecon/1.0` — don't rotate it (invariant 7), and it wouldn't help with 429 anyway (the block is IP-keyed).
+- RIDB `/facilities/{id}` for an unknown id returns 200 with every field empty; `ridb_facility` normalises that to `None`.
+- Uses `certifi.where()` for the trust store, the only reason `certifi` is in [../requirements.txt](../requirements.txt).

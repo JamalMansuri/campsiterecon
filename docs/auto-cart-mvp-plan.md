@@ -230,8 +230,9 @@ Open question 3 from §9 settled: `/account/profile` is the session-live probe. 
   {
     "auto_cart_rules": [
       {
-        "facility_id": "234061",
-        "site_ids": ["234061_a", "234061_b"],
+        "facility_id": "233359",
+        "loop": "Coast",
+        "site_ids": ["79050", "79060"],
         "date_window": {"start": "2026-05-01", "end": "2026-05-31"},
         "nights": 2,
         "priority": 1
@@ -307,7 +308,7 @@ Captured from the prior-art deep dive. These are the patterns Phase 2 should ado
 
 ### 11.1 Concrete selectors — starting set from krosenfeld7
 
-These target the current rec.gov campsite cart flow (May 2023). Treat as **starting set**, not ground truth — re-verify with `playwright codegen https://www.recreation.gov/camping/campgrounds/233115` (Plaskett Creek, known to have multi-night availability) before committing to them.
+These target the current rec.gov campsite cart flow (May 2023). Treat as **starting set**, not ground truth — re-verify with `playwright codegen https://www.recreation.gov/camping/campgrounds/231959` (Plaskett Creek — note the id was corrected on 2026-09-20; 233115 is Union Creek, Oregon) before committing to them.
 
 | Step | Selector | Notes |
 |---|---|---|

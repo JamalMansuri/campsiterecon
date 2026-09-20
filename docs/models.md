@@ -1,113 +1,115 @@
 # recon/models.py
 
-The data contracts. Pydantic models define every JSON shape the program emits, every internal record that flows between modules, and the boundary validation for the raw Rec.gov response.
+The data contracts. Pydantic models define every JSON shape the program emits, every internal record that flows between modules, and the boundary validation for raw Rec.gov responses.
 
 [Source](../recon/models.py) · Wiki home: [README.md](README.md)
 
-## The output types
+## Weekend mode (Mode 1)
 
 ```python
-class CampsiteResult(BaseModel):       # one camp, one weekend (Mode 1 row)
-    name: str
+class SiteDetail(BaseModel):            # one open campsite
+    site: str | None                   # Rec.gov label, e.g. "003"
+    loop: str | None
+    campsite_type: str | None          # "STANDARD NONELECTRIC", "GROUP HIKE TO", "BOAT IN" ...
+    min_people: int | None; max_people: int | None
+    url: str                           # /camping/campsites/{campsite_id}
+
+class StayRules(BaseModel):            # from Rec.gov facility_rules; None when the facility has none
+    min_nights, min_weekend_nights, min_holiday_weekend_nights, max_nights: int | None
+    min_nights_policy, min_weekend_policy, min_holiday_weekend_policy: str | None   # "strict" | "soft" | "softAny"
+
+class CampsiteResult(BaseModel):       # one camp, one weekend
+    name: str                          # preset label
     facility_id: str
-    available_dates: list[str]         # ISO dates within the weekend (flat across all sites)
-    sites_by_id: dict[str, list[str]]  # {campsite_id: [iso_dates]} — fuel for the auto-cart booker
-    windows_by_site_id: dict[str, list[tuple[str, str]]]
-                                       # {campsite_id: [(start_iso, checkout_iso), ...]} — viable 2-night stays
-    permit_required: bool              # drives reservation_url shape
-    reservation_url: str               # /camping/... or /permits/...
-    contiguous: bool                   # 2+ consecutive nights of the weekend
-
-class WeatherDay(BaseModel):           # one forecast day
-    date: str
-    high_c: float
-    low_c: float
-    rain_mm: float
-    wind_kph: float
-    condition: str                     # WMO label, e.g. "Drizzle"
-
-class LocationReport(BaseModel):       # Mode 1 top-level, one per location
-    location: str
-    weekend_start: str                 # Friday ISO
-    weekend_end: str                   # Sunday ISO
-    available: bool                    # any sites open at all
-    sites: list[CampsiteResult]
-    weather: dict[str, WeatherDay]     # keys: "friday", "saturday", "sunday"
-
-class SearchResult(BaseModel):         # one facility (Mode 2 row)
-    name: str
-    facility_id: str
-    available_dates: list[str]         # ISO dates within the search range
+    official_name: str | None          # Rec.gov's facility_name — present this
+    loop: str | None                   # set for loop-scoped presets (Point Reyes)
+    loop_matched: bool | None          # False = the loop matched no campsite at all → warning
+    skipped_sites: int                 # malformed campsite records ignored
+    available_dates: list[str]         # ISO nights within Fri/Sat/Sun, union across sites
+    sites_by_id: dict[str, list[str]]  # {campsite_id: [iso_nights]} — fuel for the auto-cart booker (durable)
+    windows_by_site_id: dict[str, list[tuple[str, str]]]   # viable 2-night (first_night, checkout) pairs (durable)
+    site_details: dict[str, SiteDetail]                    # same keys as sites_by_id
+    stay_rules: StayRules | None       # a lone open night at a min_nights=2 campground is not bookable
+    permit_required: bool
     reservation_url: str
-    contiguous: bool                   # any 2 consecutive days, weekend or not
+    contiguous: bool
 
-class SearchReport(BaseModel):         # Mode 2 top-level
-    query: str
-    start: str
-    end: str
-    results: list[SearchResult]
+class LocationReport(BaseModel):
+    location: str
+    weekend_start: str                 # Friday
+    weekend_end: str                   # Sunday (last night checked)
+    nights: list[str]                  # the three nights, explicit
+    available: bool
+    sites: list[CampsiteResult]
+    unreachable: list[str]             # camps whose fetch failed — "couldn't check", never "full"
+    warnings: list[str]                # e.g. Rec.gov rate-limited this run
+    weather: dict[str, WeatherDay]     # "friday"/"saturday"/"sunday"; empty beyond 14 days
 ```
 
-## The raw-response types (boundary validation)
-
-Two additional models describe the shape of the raw `/api/camps/availability/campground/{id}/month` response. These are not emitted as JSON — they exist so [parser.md](parser.md) and [search.md](search.md) can validate the API response at the boundary:
+## Search mode (Mode 2)
 
 ```python
-class RawSiteAvailability(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # tolerate Rec.gov adding fields
-    availabilities: dict[str, str]             # {iso_datetime: status}
-    loop: str | None = None
-    site: str | None = None                    # human-readable, e.g. "A007"
-    campsite_type: str | None = None
+class SearchSite(BaseModel):
+    campsite_id: str; site: str | None; loop: str | None; campsite_type: str | None
+    min_people: int | None; max_people: int | None; dates: list[str]; url: str
+
+class SearchResult(BaseModel):
+    name: str                          # display name (title-cased only if RIDB shouted)
+    official_name: str | None          # RIDB FacilityName verbatim
+    facility_id: str
+    rec_area: str | None               # parent rec area — the query is fuzzy, say where it is
+    latitude: float | None; longitude: float | None
+    distance_km: float | None          # from the report's `anchor` rec area, when resolved
+    available_dates: list[str]
+    open_site_count: int
+    skipped_sites: int
+    sample_sites: list[SearchSite]     # up to 5; any site with a 2-night window first, then most open nights
+    stay_rules: StayRules | None
+    reservation_url: str
+    contiguous: bool                   # per-site; always False for permits
+
+class SearchReport(BaseModel):
+    query: str; start: str; end: str
+    anchor: str | None                 # rec area the query resolved to; results sorted by distance from it
+    facilities_total: int              # RIDB TOTAL_COUNT
+    facilities_scanned: int
+    skipped_far: list[str]             # keyword matches > 150 km from the anchor, not checked
+    unreachable: list[str]; partial: list[str]; warnings: list[str]
+    results: list[SearchResult]        # contiguous is per-site, see parser.md
+```
+
+## `--verify`
+
+`VerifiedCamp` / `VerifyReport` — see [verify.md](verify.md).
+
+## Raw-response types (boundary validation)
+
+```python
+class RawSiteAvailability(BaseModel):  # extra="ignore"
+    availabilities: dict[str, str]; quantities: dict[str, int] | None
+    campsite_id, loop, site, campsite_type, campsite_reserve_type, type_of_use: str | None
+    hide_external: bool = False
 
 class RawCampgroundResponse(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    campsites: dict[str, RawSiteAvailability]  # outer key = campsite_id (the bit the booker needs)
+    campsites: dict[str, RawSiteAvailability]; count: int | None
+
+class RawPermitDate(BaseModel):        total, remaining: int | None; show_walkup, is_secret_quota: bool
+class RawPermitDivision(BaseModel):    division_id: str | None; date_availability: dict[str, RawPermitDate]
 ```
 
 Shape borrowed from camply — see [camply-attribution.md](camply-attribution.md).
 
-## The `is_available(status)` helper
+## Helpers
 
-Module-level function. Returns `False` for any status in the Rec.gov denylist (`Reserved`, `Not Available`, `Not Reservable`, `Not Reservable Management`, `Not Available Cutoff`, `Lottery`, `Open`, `NYR`, `Closed`). Used by both [parser.md](parser.md) and [search.md](search.md). Note that **`"Open"` is *not* bookable** — see [camply-attribution.md](camply-attribution.md) for why.
-
-## Window enumeration: `windows_by_site_id`
-
-The new `CampsiteResult.windows_by_site_id` field gives, per campsite, every viable 2-night `(start_iso, checkout_iso)` window. A 3-night run produces 2 entries; a 5-night run produces 4. Empty for sites with only single-night availability. Powered by [windows.md](windows.md) — see [banool-attribution.md](banool-attribution.md) for the algorithm's provenance.
-
-The Phase 3 auto-cart matcher (see [auto-cart-mvp-plan.md](auto-cart-mvp-plan.md)) calls `consecutive_nights()` directly with arbitrary `nights` from `targets.json`; this field surfaces the default-2 case in the JSON output for OpenClaw.
+- `is_available(status)` — denylist (`Reserved`, `Not Available`, `Not Reservable`, `Not Reservable Management`, `Not Available Cutoff`, `Lottery`, `Open`, `NYR`, `Closed`). **`"Open"` is not bookable.**
+- `is_bookable_site(site)` — drops `hide_external` and `type_of_use == "Day"` sites before any date is counted.
 
 ## Output contracts
 
 | Mode | Top-level emitted by main.py | JSON shape |
 |---|---|---|
-| Weekend (Mode 1) | `list[LocationReport]` | array — one per preset location |
-| Search (Mode 2) | `SearchReport` | object with `results[]` |
+| Weekend | `list[LocationReport]` | array |
+| Search | `SearchReport` | object; cron gates on `.results \| length > 0` |
+| Verify | `VerifyReport` | object; exit 1 unless `ok` |
 
-[../SKILL.md](../SKILL.md) tells the LLM how to read each shape and present it to the user. Watch mode (Mode 3) emits the same `SearchReport` — it's just Mode 2 on a cron with `jq -e '.results | length > 0'` gating notifications.
-
-## Why Pydantic, not dataclasses
-
-- `model_dump(mode="json")` serializes cleanly to JSON in [main.md](main.md) — no custom encoder.
-- `model_validate()` enforces the API contract at the boundary — if Rec.gov renames or removes a field, we find out at parse time, not when the auto-cart booker silently clicks the wrong site.
-- `extra="ignore"` lets the API add fields without breaking us — important for an undocumented endpoint.
-- Same field-list-as-contract benefit as dataclasses, but with validation included.
-
-## Field naming conventions
-
-- **`name`** is always the human-readable camp/facility name (title case).
-- **`facility_id`** is always a string, even though Rec.gov sometimes returns ints.
-- **`available_dates`** is always sorted ISO strings (`YYYY-MM-DD`), never `date` objects — JSON serialization wants strings, and the LLM-facing reply layer formats them into "Jul 3, 4, 5".
-- **`contiguous`** uses the same primitive ([`consecutive_nights`](windows.md)) in both modes — the difference is the prefiltered window passed in (Fri/Sat/Sun in weekend mode, the `--start..--end` range in search mode). See [parser.md](parser.md) and [search.md](search.md).
-- **`reservation_url`** is constructed in [parser.md](parser.md) (Mode 1) and inline in [search.md](search.md) (Mode 2). Both honor the permit-vs-campground URL distinction — see [config.md](config.md).
-
-## Adding a field
-
-If a new field is added to any of these:
-
-1. Update the model here.
-2. Set it in whichever module produces the type ([parser.md](parser.md), [search.md](search.md), or [weather.md](weather.md)).
-3. Update [../SKILL.md](../SKILL.md) so the LLM knows it exists in the JSON.
-4. Update the relevant wiki page so future readers see the shape change.
-
-The JSON output is the program's contract with OpenClaw. Treat field renames as breaking changes.
+Every field is additive; nothing that existed before 2026-09-20 was renamed or removed, so existing cron lines keep working.

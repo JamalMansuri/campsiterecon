@@ -1,48 +1,45 @@
 # recon/search.py
 
-Free-text location search. Turns "Yosemite, July 3–5" into a list of bookable campgrounds with their open dates. The whole of Mode 2 lives here.
+Free-text location search. Turns "Yosemite, July 3–5" into a list of bookable campgrounds with their open nights, sample sites and where each campground actually is. The whole of Mode 2 lives here.
 
 [Source](../recon/search.py) · Wiki home: [README.md](README.md)
 
 ## Public surface
 
 ```python
-def search(client: RecGovClient, query: str, start: date, end: date, limit: int = 25) -> SearchReport
+def search(client: RecGovClient, query: str, start: date, end: date, max_results: int = 150) -> SearchReport
+def rate_limit_warning(client, unchecked: int) -> list[str]
 ```
 
-Returns a `SearchReport` (see [models.md](models.md)) with a `results[]` array. Each result is one facility that has at least one open date in the requested range.
+Returns a `SearchReport` (see [models.md](models.md)) with `results[]`, plus `facilities_total` / `facilities_scanned` / `unreachable[]` / `warnings[]` so the LLM can say how complete the scan was.
 
 ## Flow
 
-1. **RIDB lookup** — `client.ridb_search_campgrounds(query)` returns up to `limit` reservable facilities matching the query.
-2. **Compute the calendar months spanned** — `_months_spanned(start, end)` walks year/month from start to end. Cross-month ranges (e.g. `2026-07-30` → `2026-08-02`) yield `[(2026, 7), (2026, 8)]`.
-3. **Per facility, per month**: call `client.campground_month()`. Merge open dates from each month's response.
-4. **Filter to the target date set** — `_open_dates_in_range()` keeps only dates that fall inside `start..end` and have status `Available` or `Open`.
-5. **Drop facilities with zero open dates.** Empty results don't pollute the output.
-6. **Emit a `SearchResult` per surviving facility** with the merged dates, a reservation URL, and a `contiguous` flag.
+1. **RIDB lookup** — `client.ridb_search_campgrounds(query)` pages through every match (RIDB caps pages at 50 and used to hide Upper/Lower/North Pines behind the old `limit=25`), keeping only `Campground` + `Reservable` + `Enabled` records.
+2. **Resolve an anchor** — `client.ridb_search_recarea(query)` picks the first RIDB rec area whose name contains every word of the query and has coordinates ("Yosemite" → Yosemite National Park; "Big Sur" → none). With an anchor, each facility gets `distance_km` and anything beyond 150 km is put in `skipped_far[]` *before* any availability call — that's what keeps a Shasta-Trinity "Camp 4 Group Campground" out of a Yosemite watch (and out of Mode 3 notifications). Without an anchor nothing is filtered.
+3. **Months spanned** — `months_spanned(start, end)` (in [windows.md](windows.md)) walks year/month; cross-month and cross-year ranges work.
+4. **Per facility, per month** — `client.campground_month()`; responses are cached in the client. A facility whose every month returns `None` goes to `unreachable[]`; one with some months missing goes to `partial[]` with the months named. Neither is "no availability".
+5. **Collect sites** — [`collect_open_sites()`](parser.md) with the full date range and no loop filter; per-site date sets are merged across months.
+6. **Emit** a `SearchResult` per facility with at least one open night: display name (title-cased only when RIDB shouts), `official_name`, `rec_area` (one cached `/recareas/{id}` call per distinct parent), lat/lon, `distance_km`, `open_site_count`, `stay_rules` (one keyless `/api/camps/campgrounds/{id}` call per facility *with* openings), and `sample_sites` — the 5 sites with the most open nights, each with `campsite_type`, `min/max_people` and a `site_url` deep link. Results are sorted by distance from the anchor. An unreachable facility carries its reason: `"Name (HTTP 404)"`.
+7. `warnings[]` gets a line if RIDB itself failed (bad key → HTTP 401/403 used to look like "no campgrounds"), if a later RIDB page failed (list truncated), if malformed campsite records were skipped, or if the client tripped its 429 breaker mid-run.
 
-## `contiguous` reuses the same primitive as weekend mode
+## `contiguous` is per site
 
-```python
-contiguous = bool(consecutive_nights(open_dates, nights=2))
-```
-
-Powered by [`consecutive_nights()`](windows.md) — same function the parser uses, just operating on the merged facility-level date set instead of per-site sets. Search mode does **not** populate per-site windows (sites_by_id is dropped during the per-site merge in `_open_dates_in_range`). If per-site windows are needed for search-mode results, the merge step would have to be refactored to preserve `campsite_id` first.
-
-The "any two consecutive days in the queried range" semantic is unchanged from before; the implementation is just cleaner now and the function generalizes to N nights for the future auto-cart matcher.
+`any(consecutive_nights(dates, 2) for each open site)` — a 2-night stay has to be at one site. The facility-level union (`available_dates`) can show two consecutive nights that belong to two different sites; that is two one-night trips, and `contiguous` is `False` for it. Same rule as [parser.md](parser.md).
 
 ## What search mode deliberately does NOT do
 
-- **No weather.** Open-Meteo's free forecast only goes 14 days out, and search mode is designed for trips months ahead. Calling [weather.md](weather.md) would just return empty for most queries. Skipping it also keeps Mode 2 fast.
-- **No permit endpoint.** Permit-only camps (Point Reyes pattern) won't appear in results. By design — search mode trusts that the user knows to use a preset for those, and [SKILL.md](../SKILL.md) routes them accordingly.
-- **No facility deduping.** RIDB sometimes returns the same facility under multiple records with different IDs. We trust RIDB's output and let dupes through; in practice this is rare.
+- **No weather.** Open-Meteo's forecast only goes 14 days out.
+- **No permit endpoint.** Wilderness permits (Yosemite, Half Dome) won't appear; RIDB `Permit` records are filtered out before scanning.
+- **No fine relevance ranking beyond distance.** RIDB's free-text match is fuzzy — "Yosemite" legitimately returns Stanislaus NF, Sierra NF and BLM Merced River campgrounds within 150 km. `rec_area` and `distance_km` are emitted so the LLM can qualify each result rather than pretend they're all inside the park.
+- **No facility deduping.** Rare in practice.
+
+## Cost
+
+Each facility costs `len(months_spanned)` availability requests, paced at 0.6 s, plus one unthrottled metadata call per facility with openings. "Yosemite" over one month is ~31 facilities ≈ 12–15 s. Rec.gov answers 429 to bursts; see [api_client.md](api_client.md).
 
 ## Upstream / downstream
 
-- **Called by**: [main.md](main.md) when `--search` is present
-- **Calls**: [api_client.md](api_client.md) (RIDB + campground endpoints)
+- **Called by**: [main.md](main.md) when `--search` is present (and `rate_limit_warning` from weekend mode)
+- **Calls**: [api_client.md](api_client.md), [parser.md](parser.md)
 - **Outputs**: `SearchReport` from [models.md](models.md)
-
-## Limit
-
-Default is 25 facilities. Each facility costs `len(months_spanned)` HTTP calls, so a 3-month range with 25 facilities is 75 requests. Don't crank `limit` without thinking about that.
