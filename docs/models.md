@@ -51,6 +51,7 @@ class LocationReport(BaseModel):
 ```python
 class SearchSite(BaseModel):
     campsite_id: str; site: str | None; loop: str | None; campsite_type: str | None
+    category: str | None               # "group" | "boat_in" | None; non-null only with --all-site-types
     min_people: int | None; max_people: int | None; dates: list[str]; url: str
 
 class SearchResult(BaseModel):
@@ -61,7 +62,9 @@ class SearchResult(BaseModel):
     latitude: float | None; longitude: float | None
     distance_km: float | None          # from the report's `anchor` rec area, when resolved
     available_dates: list[str]
-    open_site_count: int
+    open_site_count: int               # group / boat-in sites excluded unless --all-site-types
+    excluded_open_sites: dict[str, int]  # {"group": n, "boat_in": m} — open but not counted (default mode)
+    special_open_sites: dict[str, int]   # same shape — counted; only with --all-site-types
     skipped_sites: int
     sample_sites: list[SearchSite]     # up to 5; any site with a 2-night window first, then most open nights
     stay_rules: StayRules | None
@@ -70,11 +73,13 @@ class SearchResult(BaseModel):
 
 class SearchReport(BaseModel):
     query: str; start: str; end: str
+    site_types: str                    # "standard" (group + boat-in skipped, default) | "all"
     anchor: str | None                 # rec area the query resolved to; results sorted by distance from it
     facilities_total: int              # RIDB TOTAL_COUNT
     facilities_scanned: int
     skipped_far: list[str]             # keyword matches > 150 km from the anchor, not checked
     unreachable: list[str]; partial: list[str]; warnings: list[str]
+    group_or_boat_only: list[str]      # facilities open only at group / boat-in sites; not in results
     results: list[SearchResult]        # contiguous is per-site, see parser.md
 ```
 

@@ -11,6 +11,7 @@ python main.py                                                  # weekend mode, 
 python main.py --location point_reyes                           # weekend mode, one preset
 python main.py --location big_sur --date 2026-05-01             # weekend mode, specific Friday
 python main.py --search "Yosemite" --start 2026-07-03 --end 2026-07-05   # search mode
+python main.py --search "Point Reyes" --start … --end … --all-site-types   # also count group + boat-in sites
 python main.py --verify                                         # check every preset id; exit 1 on mismatch
 python main.py --debug --location big_sur                       # print swallowed HTTP errors to stderr
 ```

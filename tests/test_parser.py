@@ -161,3 +161,52 @@ def test_stay_rules_keep_policy_qualifier():
     }})
     assert rules.min_nights_policy == "softAny" and rules.min_holiday_weekend_policy == "strict"
     assert rules.min_weekend_nights == 2 and rules.min_weekend_policy is None
+
+
+def test_site_category_vocabulary():
+    from recon.models import RawSiteAvailability as S
+    from recon.parser import site_category
+    cases = {
+        "STANDARD NONELECTRIC": None, "HIKE TO": None, "WALK TO": None, "TENT ONLY NONELECTRIC": None,
+        "RV ELECTRIC": None, "CABIN NONELECTRIC": None, "EQUESTRIAN NONELECTRIC": None,
+        "GROUP HIKE TO": "group", "GROUP STANDARD ELECTRIC": "group", "GROUP TENT ONLY AREA NONELECTRIC": "group",
+        "group walk to": "group", "GROUP EQUESTRIAN": "group",
+        "BOAT IN": "boat_in", "boat in": "boat_in", "MOORING": "boat_in", "ANCHORAGE": "boat_in",
+    }
+    for kind, expected in cases.items():
+        assert site_category(S(campsite_type=kind)) == expected, kind
+    # type missing → fall back to the label; a label never overrides a real type
+    assert site_category(S(site="008 GROUP")) == "group"
+    assert site_category(S(site="BOAT A, 1-6 people")) == "boat_in"
+    assert site_category(S(site="GROUPER COVE 12")) is None
+    assert site_category(S(campsite_type="STANDARD NONELECTRIC", site="GROUP OVERFLOW")) is None
+    assert site_category(S()) is None
+    # boat wins over group — on the type path, the label path, and when the label refines a GROUP type
+    assert site_category(S(campsite_type="GROUP BOAT IN")) == "boat_in"
+    assert site_category(S(site="TOMALES BEACH GROUP, BOAT ONLY, 15-25 people")) == "boat_in"
+    assert site_category(S(campsite_type="GROUP TENT ONLY AREA NONELECTRIC",
+                           site="TOMALES BEACH GROUP, BOAT ONLY, 15-25 people")) == "boat_in"
+    assert site_category(S(campsite_type="GROUP TENT ONLY AREA NONELECTRIC", site="MARSHALL BEACH GROUP, 15-25 people")) == "group"
+    # a label never promotes an ordinarily-typed site, even to boat_in
+    assert site_category(S(campsite_type="HIKE TO", site="BOAT LAUNCH VIEW 4")) is None
+    # label fallback: case-insensitive, comma-tolerant; types: whitespace-tolerant
+    assert site_category(S(site="Group Site 2")) == "group"
+    assert site_category(S(site="MARSHALL BEACH GROUP, 15-25 people")) == "group"
+    assert site_category(S(campsite_type=" MOORING ")) == "boat_in"
+    assert site_category(S(campsite_type="  group   walk to ")) == "group"
+    assert site_category(S(campsite_type="   ", site="008 GROUP")) == "group"      # whitespace-only type counts as missing
+
+
+def test_weekend_mode_keeps_group_and_boat_sites(point_reyes_month):
+    """Weekend mode never filters by type: sites_by_id / site_details are durable for the auto-cart matcher."""
+    whole = _campground(point_reyes_month, Camp("Point Reyes", "233359"))
+    kinds = {sid: d.campsite_type for sid, d in whole.site_details.items()}
+    fixture_open = {sid for sid, s in point_reyes_month["campsites"].items()
+                    if any(st == "Available" and dt[:10] in ("2026-10-09", "2026-10-10", "2026-10-11")
+                           for dt, st in s["availabilities"].items())}
+    assert set(whole.sites_by_id) == fixture_open                       # nothing dropped, whatever its type
+    special_open = [sid for sid in fixture_open
+                    if "GROUP" in (point_reyes_month["campsites"][sid]["campsite_type"] or "")
+                    or "BOAT" in (point_reyes_month["campsites"][sid]["campsite_type"] or "")]
+    assert special_open, "fixture should contain at least one open group/boat-in site for this test to mean anything"
+    assert all(sid in kinds for sid in special_open)

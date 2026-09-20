@@ -215,6 +215,8 @@ def main() -> None:
     p.add_argument("--search", help="Free-text location query (e.g. 'Yosemite')")
     p.add_argument("--start",  help="Search start date YYYY-MM-DD")
     p.add_argument("--end",    help="Search end date YYYY-MM-DD")
+    p.add_argument("--all-site-types", action="store_true",
+                   help="Search mode: also count group and boat-in campsites (skipped by default)")
     p.add_argument("--verify", action="store_true",
                    help="Check every preset facility id against RIDB + Rec.gov and exit 1 on any mismatch")
     p.add_argument("--debug",  action="store_true", help="Print swallowed HTTP errors to stderr")
@@ -250,7 +252,7 @@ def main() -> None:
         end    = _parse_iso(args.end, "--end")
         if end < start:
             _json_error(f"--end {args.end} is before --start {args.start}")
-        report = search(client, args.search, start, end)
+        report = search(client, args.search, start, end, include_all_site_types=args.all_site_types)
         print(json.dumps(report.model_dump(mode="json"), indent=2))
         return
 

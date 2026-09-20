@@ -68,6 +68,7 @@ Production is **not** this checkout. It is `/Users/jambot/.openclaw/workspace/ca
 - Weekend mode, loop case: `python main.py --location point_reyes` — four sites all with `facility_id` 233359, distinct `loop`, `official_name` "Point Reyes National Seashore Campground".
 - Weekend mode, single-day case: `python main.py --location pinnacles` — `sites_by_id` populated, `windows_by_site_id` empty when only one night is open.
 - Search mode: `python main.py --search "Yosemite" --start 2026-10-01 --end 2026-10-15` — `anchor` "Yosemite National Park", `facilities_total` ≈ 43, a few far keyword matches in `skipped_far`, Upper/Lower/North Pines scanned (they may simply be full), each result carrying `rec_area` + `distance_km`, sorted nearest-first.
+- Site types: `--search "Point Reyes"` results exclude the Tomales Bay boat-in and the `* GROUP` sites by default and report them in `excluded_open_sites`; `--all-site-types` brings them back. Weekend mode never filters by type.
 - Month boundary: `python main.py --location pinnacles --date 2026-10-30` — nights Oct 30/31 + Nov 1; no `warnings` about a missing month.
 - Validate JSON shape: pipe any of the above through `python -m json.tool`.
 - If everything comes back `unreachable`, run with `--debug`: Rec.gov's availability endpoint answers HTTP 429 to bursts (it did during the 2026-09-20 investigation); wait a few minutes.

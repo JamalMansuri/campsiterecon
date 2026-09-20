@@ -193,3 +193,104 @@ def test_ridb_truncation_and_skipped_sites_are_warned():
     assert any("RIDB stopped answering after 1 of 40" in w for w in report.warnings)
     assert any("unrecognised shape" in w for w in report.warnings)
     assert report.results[0].skipped_sites == 1
+
+
+def _site(kind, label, *days):
+    return {"loop": "L", "site": label, "campsite_type": kind,
+            "availabilities": {f"2026-10-{d:02d}T00:00:00Z": "Available" for d in days}}
+
+
+def _mixed():
+    return {"campsites": {
+        "std":   _site("HIKE TO", "003", 9),                                    # one night only
+        "grp":   _site("GROUP HIKE TO", "008 GROUP", 9, 10, 11),                # the only 2-night window is a group site
+        "boat":  _site("BOAT IN", "BOAT A, 1-6 people", 9, 10),
+        "beach": _site("GROUP TENT ONLY AREA NONELECTRIC", "TOMALES BEACH GROUP, BOAT ONLY", 10),
+    }}
+
+
+def test_group_and_boat_sites_are_skipped_by_default():
+    client = AnchoredClient([_fac("9", "Point Reyes National Seashore Campground")], 1, months={"9": _mixed()})
+    report = search(client, "x", date(2026, 10, 9), date(2026, 10, 11))
+    assert report.site_types == "standard"
+    r = report.results[0]
+    assert r.open_site_count == 1 and [s.campsite_id for s in r.sample_sites] == ["std"]
+    assert r.available_dates == ["2026-10-09"]                   # group/boat nights are not counted
+    assert r.contiguous is False                                 # the 2-night window was a group site
+    assert r.excluded_open_sites == {"boat_in": 2, "group": 1}   # ...but nothing vanished silently (the boat-only group beach is boat_in)
+    assert r.special_open_sites == {} and all(x.category is None for x in r.sample_sites)
+    assert report.group_or_boat_only == []
+
+
+def test_all_site_types_flag_brings_them_back():
+    client = AnchoredClient([_fac("9", "X")], 1, months={"9": _mixed()})
+    report = search(client, "x", date(2026, 10, 9), date(2026, 10, 11), include_all_site_types=True)
+    r = report.results[0]
+    assert report.site_types == "all"
+    assert r.open_site_count == 4 and r.contiguous is True and r.excluded_open_sites == {}
+    assert r.available_dates == ["2026-10-09", "2026-10-10", "2026-10-11"]
+    assert r.sample_sites[0].campsite_id == "grp"
+
+
+def test_facility_open_only_at_group_or_boat_sites_is_listed_not_returned():
+    only = {"campsites": {"g": _site("GROUP STANDARD NONELECTRIC", "G1", 9, 10), "b": _site("BOAT IN", "B1", 9)}}
+    client = AnchoredClient([_fac("1", "PINES GROUP STANISLAUS"), _fac("2", "Normal Camp")], 2,
+                            months={"1": only, "2": {"campsites": {"s": _site("STANDARD NONELECTRIC", "001", 9)}}})
+    report = search(client, "x", date(2026, 10, 9), date(2026, 10, 10))
+    assert [r.facility_id for r in report.results] == ["2"]      # so the Mode 3 jq gate can't fire on group-only openings
+    assert report.group_or_boat_only == ["Pines Group Stanislaus (1 boat-in + 1 group sites only)"]
+    assert report.unreachable == []
+
+
+def test_all_mode_names_the_special_sites_without_displacing_the_window_site():
+    raw = {"campsites": {f"s{i}": _site("STANDARD NONELECTRIC", f"{i:03d}", 9, 10, 11) for i in range(6)}}
+    raw["campsites"]["grp"] = _site("GROUP STANDARD NONELECTRIC", "G1", 10)          # 1 night: ranks last
+    raw["campsites"]["boat"] = _site("BOAT IN", "BOAT A", 10)
+    client = AnchoredClient([_fac("9", "X")], 1, months={"9": raw})
+    r = search(client, "x", date(2026, 10, 9), date(2026, 10, 11), include_all_site_types=True).results[0]
+    assert r.open_site_count == 8 and r.excluded_open_sites == {}
+    assert r.special_open_sites == {"boat_in": 1, "group": 1}
+    assert len(r.sample_sites) == 5
+    assert r.sample_sites[0].campsite_id == "s0" and r.sample_sites[0].category is None   # still the 2-night site to link
+    assert {x.category for x in r.sample_sites} == {None, "group", "boat_in"}             # each category is visible
+    # ...and the default run of the same facility never shows them
+    d = search(client, "x", date(2026, 10, 9), date(2026, 10, 11)).results[0]
+    assert d.open_site_count == 6 and d.excluded_open_sites == {"boat_in": 1, "group": 1}
+    assert all(x.category is None for x in d.sample_sites)
+
+
+def test_group_only_facility_with_a_missing_month_is_partial_and_listed():
+    only = {"campsites": {"g": _m("GROUP HIKE TO", "008 GROUP", "2026-10-31")}}
+    client = AnchoredClient([_fac("9", "X")], 1, months={})
+    client.campground_month = lambda fid, y, m: only if m == 10 else None
+    report = search(client, "x", date(2026, 10, 31), date(2026, 11, 1))
+    assert report.results == []                                   # the cron gate stays shut
+    assert report.partial == ["X (2026-11 not checked)"]          # both statements are true, both are reported
+    assert report.group_or_boat_only == ["X (1 group site only)"] # singular wording
+    assert report.unreachable == []
+
+
+def _m(kind, label, iso, status="Available"):
+    return {"loop": "L", "site": label, "campsite_type": kind, "availabilities": {f"{iso}T00:00:00Z": status}}
+
+
+def test_excluded_counts_are_per_site_across_months_and_only_open_sites():
+    october = {"campsites": {"grp": _m("GROUP STANDARD NONELECTRIC", "G1", "2026-10-31"),
+                             "full": _m("GROUP STANDARD NONELECTRIC", "G2", "2026-10-31", "Reserved"),
+                             "std": _m("STANDARD NONELECTRIC", "001", "2026-10-31")}}
+    november = {"campsites": {"grp": _m("GROUP STANDARD NONELECTRIC", "G1", "2026-11-01"),
+                              "std": _m("STANDARD NONELECTRIC", "001", "2026-11-01")}}
+    client = AnchoredClient([_fac("9", "X")], 1, months={})
+    client.campground_month = lambda fid, y, m: october if m == 10 else november
+    r = search(client, "x", date(2026, 10, 31), date(2026, 11, 1)).results[0]
+    assert r.excluded_open_sites == {"group": 1}                  # one site open in two months is ONE site; Reserved ones don't count
+    assert r.open_site_count == 1 and r.contiguous is True
+
+
+def test_mixed_case_and_padded_types_are_filtered_through_the_full_path():
+    raw = {"campsites": {"a": _site("  group   hike to ", "G", 9), "b": _site("Boat In", "B", 9), "c": _site(" mooring ", "M", 9),
+                         "d": _site("Standard Nonelectric", "001", 9)}}
+    client = AnchoredClient([_fac("9", "X")], 1, months={"9": raw})
+    r = search(client, "x", date(2026, 10, 9), date(2026, 10, 9)).results[0]
+    assert [x.campsite_id for x in r.sample_sites] == ["d"]
+    assert r.excluded_open_sites == {"boat_in": 2, "group": 1}
