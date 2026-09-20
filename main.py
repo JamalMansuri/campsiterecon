@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 from datetime import date, timedelta
+from pathlib import Path
 
 from recon.api_client import RecGovClient
 from recon.availability import fetch_camp_availability
@@ -19,6 +20,18 @@ from recon.weather import fetch_weekend_weather
 _HARDCODED_API_KEY_FALLBACK = " "
 
 _KEYCHAIN_SERVICES = ("recreation-gov-api", "recreation_gov_api", "recreation_gov_api_key")
+
+# Written on the Mac mini by deploy/fetch_ridb_key.sh from 1Password (the source of truth there).
+# `op` is deliberately NOT called from here: on that box it hangs instead of failing and a cold
+# read takes up to a minute, so the fetch happens off the request path and we only read its cache.
+_KEY_FILE = Path(os.environ.get("CAMPSITESCOUT_KEY_FILE", "~/.campsitescout/ridb_api_key")).expanduser()
+
+
+def _key_file() -> str:
+    try:
+        return _KEY_FILE.read_text().strip()
+    except OSError:
+        return ""
 
 
 def _keychain_macos() -> str:
@@ -88,6 +101,9 @@ def _credential_manager_windows() -> str:
 
 
 def _get_api_key() -> str:
+    key = _key_file()          # first: a 1Password-synced cache beats a possibly stale Keychain item
+    if key:
+        return key
     if sys.platform == "darwin":
         key = _keychain_macos()
         if key:
@@ -209,7 +225,8 @@ def main() -> None:
     api_key = _get_api_key()
     if (args.search or args.verify) and not api_key:
         print(json.dumps({"error": (
-            "No RIDB API key found. Provide it one of three ways: "
+            "No RIDB API key found. Provide it one of these ways: "
+            "(0) on the Mac mini, run deploy/fetch_ridb_key.sh to cache it from 1Password; "
             "(1) macOS Keychain — security add-generic-password -a $USER -s recreation-gov-api -w <KEY>; "
             "(2) Windows Credential Manager — cmdkey /generic:recreation-gov-api /user:rec /pass:<KEY>; "
             "(3) env var RIDB_API_KEY or REC_GOV_API_KEY; "

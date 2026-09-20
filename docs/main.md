@@ -33,8 +33,9 @@ Weekend mode also calls [weather.md](weather.md) per location. Search mode does 
 
 ## API key resolution
 
-`_get_api_key()` walks four sources in order and returns the first non-empty match:
+`_get_api_key()` walks these sources in order and returns the first non-empty match:
 
+0. **1Password-synced cache** — `~/.campsitescout/ridb_api_key` (or `CAMPSITESCOUT_KEY_FILE`). Only exists on the Mac mini, where [deploy/fetch_ridb_key.sh](../deploy/fetch_ridb_key.sh) writes it from 1Password and the auto-deploy LaunchAgent refreshes it when RIDB rejects it. It goes first so a stale Keychain item can never shadow a rotated key. `main.py` never calls `op` itself — see [deploy.md](deploy.md) for why.
 1. **macOS Keychain** — `security find-generic-password -s recreation-gov-api` (then the underscored `recreation_gov_api` / `recreation_gov_api_key` names the Mac mini used). The account comes from `$USER` or `getpass.getuser()`, so it works under cron. Only consulted on `darwin`.
 2. **Windows Credential Manager** — `advapi32.CredReadW("recreation-gov-api")` via `ctypes`. Only on `win32`. No external deps.
 3. **Env var** — `RIDB_API_KEY` or `REC_GOV_API_KEY` (either name).

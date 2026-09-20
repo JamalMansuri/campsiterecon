@@ -84,3 +84,17 @@ def test_run_location_surfaces_loop_mismatch_empty_month_and_rate_limit(monkeypa
     assert any("loop 'Nope' matched no campsite" in w for w in report.warnings)
     assert any("lists no campsites" in w for w in report.warnings)
     assert any("rate-limiting" in w for w in report.warnings)
+
+
+def test_1password_key_cache_wins_over_keychain_and_env(monkeypatch, tmp_path):
+    import main as m
+    f = tmp_path / "ridb_api_key"
+    monkeypatch.setattr(m, "_KEY_FILE", f)
+    monkeypatch.setattr(m.sys, "platform", "darwin")
+    monkeypatch.setattr(m, "_keychain_macos", lambda: "keychain-key")
+    monkeypatch.setenv("RIDB_API_KEY", "env-key")
+    assert m._get_api_key() == "keychain-key"            # no cache file: unchanged behaviour
+    f.write_text("cached-from-1password\n")
+    assert m._get_api_key() == "cached-from-1password"
+    f.write_text("   \n")                                 # an empty cache must not mask the other sources
+    assert m._get_api_key() == "keychain-key"

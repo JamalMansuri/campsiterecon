@@ -26,4 +26,4 @@ jobs:
       - name: Run offline tests (includes the preset-id gate)
         run: python -m pytest -q tests
       - name: Shell syntax
-        run: bash -n deploy_jambot.sh && bash -n deploy/auto_deploy.sh
+        run: bash -n deploy_jambot.sh && bash -n deploy/auto_deploy.sh && bash -n deploy/fetch_ridb_key.sh

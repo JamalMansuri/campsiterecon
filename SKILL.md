@@ -31,7 +31,7 @@ metadata:
 
 ## API key — handling the "no key found" error
 
-`main.py` looks up the RIDB key in this order: macOS Keychain (service `recreation-gov-api`, also `recreation_gov_api`) → Windows Credential Manager → `RIDB_API_KEY` or `REC_GOV_API_KEY` env var → hardcoded constant `_HARDCODED_API_KEY_FALLBACK` in `main.py`. Only **Mode 2 / Mode 3 (`--search`) and `--verify`** need it — Rec.gov's availability endpoints are keyless, so Mode 1 runs without one. If it is missing where needed, `main.py` prints a JSON error and exits 1.
+`main.py` looks up the RIDB key in this order: the 1Password-synced cache `~/.campsitescout/ridb_api_key` (Mac mini only; written by `deploy/fetch_ridb_key.sh`, refreshed automatically — if search reports `HTTP 401` there, tell the user the 1Password item `recreation_gov_api` needs the current key, do not ask them to paste it) → macOS Keychain (service `recreation-gov-api`, also `recreation_gov_api`) → Windows Credential Manager → `RIDB_API_KEY` or `REC_GOV_API_KEY` env var → hardcoded constant `_HARDCODED_API_KEY_FALLBACK` in `main.py`. Only **Mode 2 / Mode 3 (`--search`) and `--verify`** need it — Rec.gov's availability endpoints are keyless, so Mode 1 runs without one. If it is missing where needed, `main.py` prints a JSON error and exits 1.
 
 **If you (the LLM) see that error, do not run any commands until you've asked the user which platform they're on and walked them through one of these.** The user may not be a developer — pick the easiest option for their OS, ask them to paste their key once, and run the command for them.
 

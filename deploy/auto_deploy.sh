@@ -18,6 +18,21 @@ cd "$REPO" || { echo "$(date '+%F %T') repo not found at $REPO"; exit 1; }
 
 log() { echo "$(date '+%F %T') $*"; }
 
+# --- RIDB key health (before the "nothing new" exit, so a key rotated in 1Password is picked up
+# within one tick). One cheap RIDB call; `op` is only spawned when the cached key is missing or
+# rejected, and at most once an hour if 1Password itself is unreachable.
+FETCH="$REPO/deploy/fetch_ridb_key.sh"; FAIL_MARK="$HOME/.campsitescout/ridb_key_fetch_failed"
+if [ -x "$FETCH" ] && ! bash "$FETCH" --check; then
+  if [ -n "$(find "$FAIL_MARK" -mmin -60 2>/dev/null)" ]; then
+    :   # tried within the hour; stay quiet
+  elif bash "$FETCH"; then
+    rm -f "$FAIL_MARK"; log "RIDB key refreshed from 1Password"
+  else
+    mkdir -p "$(dirname "$FAIL_MARK")"; touch "$FAIL_MARK"
+    log "WARNING: RIDB key is missing/rejected and 1Password fetch failed — --search and --verify will report HTTP 401 until fixed"
+  fi
+fi
+
 git fetch --quiet origin main || { log "git fetch failed"; exit 1; }
 LOCAL="$(git rev-parse HEAD)"; REMOTE="$(git rev-parse origin/main)"
 [ "$LOCAL" = "$REMOTE" ] && exit 0                                  # nothing new; stay quiet

@@ -56,11 +56,20 @@ rm -rf "$SKILL_DIR/references"                       # the old copy shipped a fa
 find "$HOME/.openclaw/workspace" -maxdepth 3 -name '*.skill' -print -delete 2>/dev/null || true
 echo "   $(grep -c "$REPO" "$SKILL_DIR/SKILL.md") commands now point at $REPO"
 
+echo "== RIDB key (from 1Password)"
+if bash deploy/fetch_ridb_key.sh --check; then
+  echo "   cached key is accepted by RIDB"
+elif [ -n "${SSH_CONNECTION:-}" ]; then
+  echo "   no working cached key, and \`op\` hangs over bare SSH — the auto-deploy LaunchAgent (GUI session) will fetch it within 15 minutes"
+else
+  bash deploy/fetch_ridb_key.sh || echo "   WARNING: could not fetch the key from 1Password (see message above)"
+fi
+
 echo "== 6/6 live preset verification (advisory)"
 if ./.venv/bin/python main.py --verify > /tmp/campsitescout-verify.json 2>/dev/null; then
   echo "   --verify ok"
 else
   echo "   WARNING: --verify did not pass — see /tmp/campsitescout-verify.json"
-  echo "   ('could not fetch' = Rec.gov 429 throttle, rerun in 10 min; 'No RIDB API key' = add the key, see docs/deploy.md)"
+  echo "   ('could not fetch' = Rec.gov 429 throttle, rerun in 10 min; 'No RIDB API key' / HTTP 401 = the 1Password fetch has not run yet, see docs/deploy.md)"
 fi
 echo "Deployed $(git rev-parse --short HEAD). Restart the gateway to load the new SKILL.md."

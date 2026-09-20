@@ -32,7 +32,7 @@ All three emit JSON consumed by OpenClaw → Telegram.
 7. **`urllib`, not `requests`.** Don't randomize User-Agent. The auto-cart context cares about session signals under Akamai; switching HTTP clients or flipping UA would actively hurt.
 8. **`recon/api_client.py` swallows network errors** by returning `None` — intentional for cron, and it must catch *everything* (`OSError`, `http.client.HTTPException`, `ValueError`), not just `HTTPError`. But failures must be *visible in the JSON*: `unreachable[]` and `warnings[]` on both report types, with the reason (404 = wrong id, 400 = bad date). The first 429 trips `rate_limited` and writes a 10-minute cooldown to `~/.campsitescout/rate_limit.json` that later runs honour — the block is per-IP and every early request extends it, so never add "retry sooner" logic. `--debug` / `CAMPSITESCOUT_DEBUG=1` prints the swallowed errors.
 9. **Weather never aborts a run.** `fetch_weekend_weather` returns `{}` on any failure or null-padded day. It is decoration.
-10. **Only RIDB needs the API key** (search, verify). Weekend mode must work without one and under cron (no `$USER`).
+10. **Only RIDB needs the API key** (search, verify). Weekend mode must work without one and under cron (no `$USER`). On the Mac mini the key's source of truth is 1Password; `deploy/fetch_ridb_key.sh` caches it to `~/.campsitescout/ridb_api_key` and `main.py` reads that file first. **Never call `op` from `main.py` or any request path** — on that box it hangs rather than fails and leaked `op daemon`s caused a 55-day outage.
 
 ## Architecture
 

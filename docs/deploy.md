@@ -15,7 +15,8 @@ GitHub Actions  (.github/workflows/ci.yml, GitHub-hosted runner)
         │  green
         ▼
 Mac mini LaunchAgent  ai.campsitescout.autodeploy  (every 15 min, outbound HTTPS only)
-  deploy/auto_deploy.sh: fetch → is origin/main new? → are its CI checks green?
+  deploy/auto_deploy.sh: RIDB key still accepted? (else re-fetch from 1Password)
+                         → fetch → is origin/main new? → are its CI checks green?
         │  yes
         ▼
 deploy_jambot.sh: save local edits → fast-forward → pip install → pytest (rollback on fail)
@@ -48,18 +49,27 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/ai.campsitescout.autodep
 launchctl kickstart -k gui/$(id -u)/ai.openclaw.gateway
 ```
 
-The RIDB key must be readable on the box for `--search` / `--verify` (weekend mode is keyless). Any one of:
+## The RIDB key comes from 1Password
+
+On the box, 1Password is the source of truth: item `recreation_gov_api` (field `credential`) in vault `openclaw_macmini`. **To rotate the key, update that item and do nothing else** — within 15 minutes the LaunchAgent notices RIDB rejecting the cached key and re-fetches.
+
+[deploy/fetch_ridb_key.sh](../deploy/fetch_ridb_key.sh) does the fetch: it sources `~/.openclaw/workspace/.1password.sh` for the service-account token, runs `op read`, **validates the value against RIDB (HTTP 200)**, and caches it at `~/.campsitescout/ridb_api_key` (mode 600, directory 700 — the same place the Rec.gov session cookies live). `main.py` reads that file first, ahead of Keychain and env. It tries `recreation_gov_api/credential`, then the near-duplicate item `recreation_gov_api_key/credential`, then `recreation_gov_api/password`, and keeps the first one RIDB accepts, so it does not matter which of the two items you updated. The key is never printed, logged, or passed in argv.
+
+`main.py` deliberately does **not** call `op` itself. On this box `op` hangs instead of failing, a cold read has taken ~60 s, and leaked `op daemon` processes caused the 2026 gateway outage — so the fetch is off the request path and wrapped like the gateway wrapper's: full path, `OP_CACHE=false`, stdout to a file, a `kill -9` watchdog, daemon reaping on timeout, and at most one attempt per hour when 1Password is unreachable.
+
+`op read` only works from a logged-in GUI session. Over bare SSH it hangs, so `deploy_jambot.sh` skips the fetch when it sees `SSH_CONNECTION` and leaves it to the LaunchAgent. To force it from a Terminal on the Mini:
 
 ```bash
-security add-generic-password -U -a "$USER" -s recreation-gov-api -w     # prompts; nothing lands in shell history
+bash ~/.openclaw/workspace/campsiterecon/deploy/fetch_ridb_key.sh && echo fetched
 ```
 
-or an existing `recreation_gov_api` / `recreation_gov_api_key` Keychain item, or `RIDB_API_KEY` in the gateway's environment.
+Weekend mode is keyless, so it keeps working whatever state the key is in. On the main Mac (no `op` CLI) the key lives in Keychain: `security add-generic-password -U -a "$USER" -s recreation-gov-api -w` prompts for it.
 
 ## Checking on it
 
 ```bash
-tail -20 ~/.openclaw/logs/campsitescout-autodeploy.log     # "deployed abc1234", "CI still running", "CI FAILED …"
+tail -20 ~/.openclaw/logs/campsitescout-autodeploy.log     # "deployed abc1234", "CI still running", "RIDB key refreshed from 1Password", …
+bash deploy/fetch_ridb_key.sh --check && echo "cached RIDB key is accepted"
 cd ~/.openclaw/workspace/campsiterecon && git log --oneline -1
 cat /tmp/campsitescout-verify.json | head -5               # last live preset check
 launchctl print gui/$(id -u)/ai.campsitescout.autodeploy | grep -E "state|last exit"
