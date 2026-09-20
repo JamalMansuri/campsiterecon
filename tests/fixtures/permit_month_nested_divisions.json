@@ -1,0 +1,125 @@
+{
+ "payload": {
+  "availability": {
+   "467531100": {
+    "date_availability": {
+     "2026-10-01T00:00:00Z": {
+      "is_secret_quota": false,
+      "remaining": 1,
+      "show_walkup": false,
+      "total": 1
+     },
+     "2026-10-02T00:00:00Z": {
+      "is_secret_quota": false,
+      "remaining": 0,
+      "show_walkup": false,
+      "total": 1
+     },
+     "2026-10-03T00:00:00Z": {
+      "is_secret_quota": false,
+      "remaining": 1,
+      "show_walkup": false,
+      "total": 1
+     }
+    },
+    "division_id": "467531100",
+    "quota_type_maps": {
+     "ConstantQuotaUsageByStartDate": {
+      "2026-10-01T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-02T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-03T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-04T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-05T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-06T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-07T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-08T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-09T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-10T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-11T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-12T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-13T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-14T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      },
+      "2026-10-15T00:00:00Z": {
+       "is_secret_quota": false,
+       "remaining": 1,
+       "show_walkup": false,
+       "total": 1
+      }
+     }
+    }
+   }
+  },
+  "next_available_date": "2026-10-01T00:00:00Z",
+  "permit_id": "4675311"
+ }
+}

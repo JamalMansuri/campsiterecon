@@ -3,3 +3,12 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+.pytest_cache/
+# local-only
+.claude/settings.local.json
+.env
+*.log
+# packaged skill zips carried a plaintext API key once; never commit one again
+*.skill
+# nested clone of the GitHub repo kept locally; never commit it
+GitHub/
