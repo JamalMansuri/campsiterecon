@@ -1,12 +1,16 @@
 # Recreation.gov API — Response Shapes & Observed Behaviour
 
-Practical reference for building on this application. Documents actual response structures, quirks, and lessons learned from live API calls. Complements `api-endpoints.md` (which covers URL patterns) and `facility-ids.md` (which covers known IDs).
+Practical reference for building on this application. Documents actual response
+structures, quirks, and lessons learned from live API calls. Complements
+`api-endpoints.md` (URL patterns) and `facility-ids.md` (verified IDs).
+Last re-verified live: **2026-09-20**.
 
 ---
 
-## Critical Gotcha — URL Encoding
+## Critical gotcha 1 — URL encoding
 
-The `start_date` parameter **must** have its colons URL-encoded. The API returns `400 {"error":"query not encoded"}` if you pass raw colons.
+The `start_date` parameter **must** have its colons URL-encoded. The API returns
+`400 {"error":"query not encoded"}` if you pass raw colons.
 
 ```
 # ❌ Breaks silently (returns None from client)
@@ -16,26 +20,29 @@ The `start_date` parameter **must** have its colons URL-encoded. The API returns
 ?start_date=2026-04-01T00%3A00%3A00.000Z
 ```
 
-This is not documented anywhere officially. Discovered during smoke testing April 2026.
+## Critical gotcha 2 — a wrong facility id still returns a valid-looking response
+
+`/api/camps/availability/campground/{id}/month` answers 200 with a full
+`campsites` payload for *any* real id. Nothing tells you the id you meant
+"Sky Camp" is actually Devils Garden Campground in Utah. That is exactly what
+happened in this repo from April to September 2026: four Point Reyes presets
+and three Big Sur presets pointed at campgrounds in UT, WA, OR and NM, and the
+output looked perfectly plausible. Always confirm an id with
+`/api/camps/campgrounds/{id}` (`facility_name`, `facility_latitude`) or RIDB
+`/facilities/{id}` before trusting it. `python main.py --verify` automates
+this for the presets.
+
+## Critical gotcha 3 — HTTP 429
+
+The availability endpoints sit behind CloudFront and answer **429 Too Many
+Requests** (empty body, no `Retry-After`) when polled in a burst. Observed
+trigger: ~60+ requests inside a minute from one IP. Metadata endpoints
+(`/api/camps/campgrounds/{id}`) and RIDB keep working while availability is
+blocked. The block is per-IP, clears only after ~6 minutes of complete silence, and every request made while blocked restarts the clock. `RecGovClient` paces availability calls (0.6 s), trips `rate_limited` on the first 429, stops for the run, and writes a 10-minute cooldown to `~/.campsitescout/rate_limit.json` that later runs honour; reports carry a `warnings` entry naming the time.
 
 ---
 
-## Two Distinct Endpoint Types
-
-Recreation.gov has two completely different availability endpoints with different response shapes. The type of camp determines which one to use — and sometimes you won't know until you try.
-
-| Type | Used for | Response key |
-|---|---|---|
-| Campground | Drive-in / standard sites | `campsites` |
-| Permit | Wilderness / backcountry | `payload.availability` |
-
-**Point Reyes is permit-booked but now returns campground data too.** As of early 2026 Rec.gov began populating the standard campground endpoint for Point Reyes wilderness camps (Sky: 51 sites, Coast: 75, Glen: 107, Wildcat: 68). Booking still happens through `/permits/{permit_id}` — the campground endpoint is read-only metadata. Never build a `/camping/campgrounds/` URL for a facility with a `permit_id`; see "Reservation URL Patterns" below. Earlier versions of this doc said the campground endpoint returned `{}` for Point Reyes — that's no longer true.
-
-**Big Sur uses the campground endpoint.** Standard drive-in sites, no permit system.
-
----
-
-## Campground Availability Response
+## Campground availability response
 
 ```
 GET /api/camps/availability/campground/{facilityId}/month
@@ -47,50 +54,86 @@ GET /api/camps/availability/campground/{facilityId}/month
 ```json
 {
   "campsites": {
-    "12345": {
-      "site": "A1",
-      "loop": "Main Loop",
-      "campsite_reserve_type": "Site-Specific",
+    "518310": {
+      "campsite_id": "518310",
+      "site": "BOAT A, 1-6 people",
+      "loop": "Tomales Bay",
+      "campsite_type": "BOAT IN",
+      "campsite_reserve_type": "Non Site-Specific",
+      "type_of_use": "Overnight",
+      "min_num_people": 1,
+      "max_num_people": 6,
+      "capacity_rating": "Single",
+      "hide_external": false,
+      "campsite_rules": {},
+      "supplemental_camping": {},
       "availabilities": {
-        "2026-04-17T00:00:00Z": "Available",
-        "2026-04-18T00:00:00Z": "Reserved",
-        "2026-04-19T00:00:00Z": "Not Available"
+        "2026-10-01T00:00:00Z": "Available",
+        "2026-10-02T00:00:00Z": "Reserved",
+        "2026-10-03T00:00:00Z": "NYR"
       },
-      "quantities": null
-    },
-    "12346": { ... }
-  }
+      "quantities": {
+        "2026-10-01T00:00:00Z": 1,
+        "2026-10-02T00:00:00Z": 0
+      }
+    }
+  },
+  "count": 51
 }
 ```
 
 ### Key observations
 
-- Top-level key is always `campsites` — if absent or empty dict, the endpoint has no data for this facility (try permit endpoint instead)
-- Date keys inside `availabilities` are ISO timestamps ending in `Z` — parse with `dt_str[:10]` to get the date portion only
-- Each key in `campsites` is an internal site ID (not human-readable) — the `site` field inside has the human label (e.g. "A1")
-- A campground with 32 sites returns 32 keys — you aggregate across all of them to determine if *any* site is open on a given date
-- `quantities` is used for group sites — usually `null` for individual sites
+- Top-level key is `campsites`; `count` mirrors its length. An empty dict means no data for that facility/month.
+- Outer key == `campsite_id`. `site` is the human label, `loop` is the named sub-area. **Point Reyes' four camps are loops** (`Sky`, `Coast`, `Glen`, `Wildcat`, plus `Tomales Bay` / `Tomales Bay Boat Only`) of facility 233359.
+- Date keys are ISO timestamps ending in `Z`; parse with `dt_str[:10]`.
+- `type_of_use` is `Overnight` or `Day`; `hide_external: true` sites are not shown on the public site. Both are filtered by `is_bookable_site()`.
+- `quantities` is `null` for some facilities and a per-date count for others; not used for the open/closed decision (status is authoritative).
+- `campsite_rules` was `{}` on every facility probed; min-stay rules are not exposed here.
 
-### Status values
+### Status values (observed live 2026-09-20 across Point Reyes, Kirk Creek, Upper Pines, Pinnacles, Lodgepole)
 
-| Status | Bookable |
+| Status | Bookable? |
 |---|---|
-| `Available` | ✅ Yes |
-| `Open` | ✅ Yes (walk-up or first-come) |
-| `Reserved` | ❌ No |
-| `Not Available` | ❌ No (closed or not offered) |
-| `Not Reservable` | ❌ No (walk-up only, cannot book online) |
-| `Not Reservable Management` | ❌ No (held by park staff) |
+| `Available` | ✅ |
+| `Open` | ❌ walk-up / first-come only (camply denylist — was a false-positive source) |
+| `Reserved` | ❌ |
+| `Not Available` | ❌ |
+| `Not Reservable` | ❌ |
+| `Not Reservable Management` | ❌ |
+| `Not Available Cutoff` | ❌ |
+| `NYR` | ❌ not yet released (outside the booking window) |
+| `Closed` | ❌ |
+| `Lottery` | ❌ |
 
-Only `Available` and `Open` should be treated as bookable. Everything else is a no.
-
-### Real observation — Big Sur (April 2026)
-
-Kirk Creek (233116) returned 32 sites. Pfeiffer Big Sur (233394) had availability on all 3 days of the weekend. Andrew Molera (234218) and Plaskett Creek (233115) were fully booked. Limekiln SP (10149046) returned `None` — likely closed or temporarily off Recreation.gov.
+Implemented as a **denylist** (`is_available`) so an unknown new status is treated as bookable and shows up in output where a human will notice it, rather than being silently dropped.
 
 ---
 
-## Permit Availability Response
+## Campground metadata
+
+```
+GET /api/camps/campgrounds/{facilityId}
+```
+
+Returns `{"campground": {...}}` with `facility_name`, `facility_latitude`,
+`facility_longitude`, `parent_asset_id`, `facility_time_zone`, `is_deactivated`,
+and **`facility_rules`** — a dict of `{"value": int, "units": str,
+"secondary_value": "soft"|"strict"|"softAny", "start_date", "end_date"}` keyed by
+rule name. Observed rules: `minConsecutiveStay` (Kirk Creek 2 softAny, Plaskett Creek 2 softAny),
+`minWeekendStay` (Kirk Creek 2 soft), `minHolidayWeekendStay` (Kirk Creek 3 **strict**) — the `secondary_value` qualifier is surfaced as `stay_rules.*_policy`; only `strict` is a hard refusal,
+`maxConsecutiveStay` (14), `reservationCutOff`, `blockReleaseDay` (Upper Pines:
+"Blocks released on the 15th of each month"), `maxConcurrentStay`. `stay_limit`
+is an empty string everywhere. No key needed; 404 for unknown ids; **not subject
+to the 429 throttle** in our observations. This is where `official_name` and
+`stay_rules` in the output come from, and what `--verify` cross-checks against
+RIDB. Per-campsite rules (`/api/camps/campsites/{id}` → `campsite_rules`, e.g.
+Point Reyes Sky 001 `maxConsecutiveStay=1`) exist too but cost one call per
+site and are not fetched.
+
+---
+
+## Permit availability response (2026 shape)
 
 ```
 GET /api/permits/{permitId}/availability/month
@@ -98,197 +141,66 @@ GET /api/permits/{permitId}/availability/month
     &commercial_acct=false
 ```
 
-### Shape
-
 ```json
 {
   "payload": {
+    "permit_id": "4675311",
+    "next_available_date": "2026-10-01T00:00:00Z",
     "availability": {
-      "2026-04-17T00:00:00Z": {
-        "remaining": 2,
-        "total": 8,
-        "status": "Available"
-      },
-      "2026-04-18T00:00:00Z": {
-        "remaining": 0,
-        "total": 8,
-        "status": "Sold Out"
+      "467531100": {
+        "division_id": "467531100",
+        "date_availability": {
+          "2026-10-01T00:00:00Z": {"total": 1, "remaining": 1, "show_walkup": false, "is_secret_quota": false},
+          "2026-10-02T00:00:00Z": {"total": 1, "remaining": 0, "show_walkup": false, "is_secret_quota": false}
+        },
+        "quota_type_maps": {}
       }
     }
   }
 }
 ```
 
-### Key observations
-
-- Response is nested under `payload.availability` — not flat like the campground response
-- Some responses omit `payload` entirely and put `availability` at the top level — always check both: `raw.get("payload", raw).get("availability", {})`
-- Date keys are the same ISO timestamp format — parse with `[:10]`
-- `remaining` is the number of permit slots left for that entry date — check `isinstance(remaining, int) and remaining > 0`
-- `total` is the daily quota — useful for showing "2 of 8 remaining"
-- `commercial_acct=false` must be included — omitting it may return commercial quota numbers instead of public availability
-
-### Real observation — Point Reyes (April 2026)
-
-As of April 2026 the campground endpoint returns populated data for all 4 wilderness camps, so we parse availability via `_parse_campground` in practice. Coast Camp and Wildcat Camp showed all 3 weekend nights open for 2026-04-17/18/19; Sky and Glen were fully reserved. When the campground endpoint is stale or closed the permit endpoint remains the authoritative fallback — do not remove that path.
+- `availability` is keyed by **division id** (entry point / trailhead / zone), and each division carries its own `date_availability`. The older flat `availability[date].remaining` shape is still handled by `permit_open_dates()` for safety.
+- A permit with nothing released yet returns divisions with empty `date_availability` and a stale `next_available_date`.
+- **No preset uses the permit path today.** Point Reyes was believed to be permit-booked; it is not (the "permit ids" in the old config were Zion Angels Landing and Central Cascades permits).
+- **This endpoint does not serve NPS wilderness permits.** Live 2026-09-20: `/api/permits/445859/availability/month` (Yosemite Wilderness) and `445857` (SEKI Wilderness) answer **HTTP 404**; only lottery / day-use style permits (Half Dome `234652`, Central Cascades `4675311`) answer 200. Wilderness permits use a different inventory API — verify before wiring one, and add a `--verify` check that `permit_month` returns 200 for any `permit_id` preset.
 
 ---
 
-## Reservation URL Patterns
-
-**The URL depends on the camp's configuration, not on which endpoint returned data.** A facility with a `permit_id` always books through `/permits/`, even when the campground endpoint returns populated availability (Point Reyes after early 2026).
-
-```python
-# Rule: key off camp.permit_id, not the endpoint that answered.
-def reservation_url(camp):
-    if camp.permit_id:
-        return f"https://www.recreation.gov/permits/{camp.permit_id}"
-    return f"https://www.recreation.gov/camping/campgrounds/{camp.facility_id}"
-```
-
-Implemented as `_reservation_url()` in `recon/parser.py`. Both `_parse_campground` and `_parse_permit` route through it, so Point Reyes URLs stay correct even when the campground endpoint is the one that answered.
-
-Do not use the campground URL for permit-booked camps — it will land the user on the wrong page (Rec.gov redirects campground URLs for permit-only facilities to a search, not the booking flow).
-
----
-
-## The Campground → Permit Fallback Pattern
-
-Some facilities are listed in RIDB with a `FacilityID` but their actual bookings run through the permit system. Point Reyes was historically the clearest example — the facility IDs existed, but the campground availability endpoint returned empty. That changed in early 2026 (see "Real observation — Point Reyes" above), but the fallback path remains load-bearing: other permit-only facilities still fit the old pattern, and Rec.gov can silently revert Point Reyes at any time.
-
-The pattern we use in `availability.py`:
-
-1. Try campground endpoint with `facility_id`
-2. If response is `None` or `campsites` is empty → try permit endpoint with `permit_id`
-3. Tag the response `{"type": "campground"}` or `{"type": "permit"}` so `parser.py` knows which shape to expect
-4. If both return nothing → return `None` (camp may be closed or offline)
-
-**URL building is independent of this path.** Even when step 1 succeeds for a permit-booked facility, `parser.py::_reservation_url()` still builds `/permits/{permit_id}` because it keys off `camp.permit_id`, not the endpoint that answered.
-
----
-
-## RIDB Facility Search (used by search mode)
+## RIDB facility search (used by search mode)
 
 ```
 GET https://ridb.recreation.gov/api/v1/facilities
-    ?query={free_text}
-    &facilitytype=Campground
-    &limit=50
-    &apikey={KEY}
+    ?query={free_text}&facilitytype=Campground&limit=50&offset={n}&apikey={KEY}
 ```
 
-### Shape
+- `apikey` is required. Availability endpoints are unauthenticated.
+- **Page size max is 50 and results are paginated**: `METADATA.RESULTS.TOTAL_COUNT` vs `CURRENT_COUNT`. "Yosemite" has 43 matches; the first 25 do *not* include Upper/Lower/North Pines. The client now walks `offset` until `TOTAL_COUNT` (cap 150).
+- `facilitytype=Campground` is only a hint: `Permit`, `Timed Entry`, `Visitor Center` and `Facility` records still come back. Filter on `FacilityTypeDescription == "Campground"`, `Reservable`, and `Enabled`.
+- `FacilityName` is inconsistent in case (`LOST CLAIM` vs `McCabe Flat Campground`); only title-case the all-caps ones.
+- `RECAREA` is an empty list in search results; use `ParentRecAreaID` → `/recareas/{id}` (`RecAreaName`) to say where a campground is. Free-text search is fuzzy — "Yosemite" returns Stanislaus NF, Sierra NF, Inyo NF and BLM Merced River campgrounds too.
+- `/facilities/{id}` for an unknown id returns **200 with every field empty**, not 404.
+- `FacilityID` is the same id the availability endpoint uses.
 
-```json
-{
-  "RECDATA": [
-    {
-      "FacilityID": "233837",
-      "FacilityName": "SUMMERDALE CAMPGROUND",
-      "FacilityTypeDescription": "Campground",
-      "Reservable": true,
-      "FacilityLatitude": 37.5183,
-      "FacilityLongitude": -119.6367,
-      "ParentRecAreaID": "2991"
-    }
-  ],
-  "METADATA": { ... }
-}
-```
+### `/recareas?query=` as a relevance anchor
 
-### Key observations
-
-- `apikey` query param is **required** — RIDB is the only endpoint in this project that uses the API key. The availability endpoints are unauthenticated.
-- `FacilityName` comes back SCREAMING CAPS — `.title()` it before presenting.
-- Always filter `Reservable: true` — RIDB returns day-use areas, visitor centres, and closed facilities mixed in.
-- `facilitytype=Campground` narrows to campgrounds but still returns some non-campable results — filter on `Reservable` as a second pass.
-- `FacilityID` is the same ID used by the `/camps/availability/campground/{id}/month` endpoint — no translation needed.
-- Free-text queries are loose: searching "Yosemite" returns Stanislaus NF and Sierra NF campgrounds in the surrounding area, not just inside YNP. This is usually what the user wants.
-- Some facilities are permit-only (Point Reyes pattern) and will not return availability via the campground endpoint. The search flow intentionally skips the permit fallback — for those, use a preset config entry with an explicit `permit_id`.
-
-### Multi-month range scanning
-
-The availability endpoint is always per-month. To cover a date range:
-
-1. Walk `(year, month)` tuples from `start.year/month` to `end.year/month` inclusive.
-2. Call `campground_month` for each.
-3. Merge the open dates from each response, filtering to the exact target range.
-
-See `recon/search.py::_months_spanned` for the implementation.
+Its first hit is frequently unrelated ("Pinnacles" → Cottonwood Point Wilderness, UT; "Tahoe" → Sugar Pine Reservoir; "Joshua Tree" → Castle Mountains NM), and some records have `0,0` coordinates ("Route 1 - Big Sur Coast Highway"). `ridb_search_recarea` therefore only accepts a record whose `RecAreaName` contains every word of the query *and* has non-zero coordinates — "Yosemite" → 2991, "Point Reyes" → 2864, "Zion" → 2994, "Sequoia" → 2931; "Big Sur" → none, so that search is unfiltered.
 
 ---
 
-## Noise in API Responses
+## Open-Meteo (weather)
 
-The RIDB search endpoint (`/facilities?query=...`) returns everything associated with a rec area — visitor centres, ranger stations, trailhead parking, group event spaces. These are not campable.
-
-Filter criteria:
-- `reservable: true` — the primary flag. Visitor centres are not reservable
-- `FacilityTypeDescription: "Campground"` — use as the `facilitytype` query param when searching RIDB
-
-Even with filtering, some results still slip through. Using hardcoded facility IDs from `facility-ids.md` avoids this entirely for known locations.
-
----
-
-## Rate Limiting
-
-No published limit, but observed behaviour:
-- Rapid sequential calls (< 1s apart) work fine for small batches (under ~10 calls)
-- Hitting the same endpoint twice in a session is wasteful — results don't change within minutes
-- If building multi-month lookahead, add a brief pause between month calls
-- The availability endpoint is read-only and widely used by third-party scrapers — be reasonable
-
----
-
-## Open-Meteo (Weather)
-
-No API key, no rate limiting observed. Returns 14-day daily forecast.
+No key, no observed rate limit, 14-day daily forecast. Weekends further out
+than 14 days produce an empty `weather` object — expected, not a bug.
 
 ```
 GET https://api.open-meteo.com/v1/forecast
     ?latitude={lat}&longitude={lon}
     &daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max
-    &temperature_unit=celsius
-    &wind_speed_unit=kmh
-    &precipitation_unit=mm
-    &timezone=auto
-    &forecast_days=14
+    &temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm
+    &timezone=auto&forecast_days=14
 ```
 
-### Shape
-
-```json
-{
-  "daily": {
-    "time":                ["2026-04-17", "2026-04-18", ...],
-    "weathercode":         [2, 3, 61, ...],
-    "temperature_2m_max":  [16.1, 16.4, 13.1, ...],
-    "temperature_2m_min":  [7.6, 8.5, 9.5, ...],
-    "precipitation_sum":   [0.0, 0.0, 4.2, ...],
-    "windspeed_10m_max":   [15.6, 11.3, 31.4, ...]
-  }
-}
-```
-
-- `time` is plain `YYYY-MM-DD` (no timestamp) — no parsing needed
-- All arrays are parallel — index `i` in `time` corresponds to index `i` in all other arrays
-- `precipitation_sum` can be `null` for days with no precipitation — coerce with `value or 0.0`
-- Wind > 25 kph is worth flagging for exposed coastal/ridge campsites
-- `timezone=auto` uses the lat/lon to determine local timezone — always include it
-
-### WMO weather codes (relevant subset)
-
-| Code | Condition |
-|---|---|
-| 0 | Clear |
-| 1 | Mainly clear |
-| 2 | Partly cloudy |
-| 3 | Overcast |
-| 45, 48 | Fog |
-| 51–55 | Drizzle |
-| 61–65 | Rain |
-| 71–75 | Snow |
-| 80–82 | Showers |
-| 95, 96, 99 | Thunderstorm |
-
-Full mapping in `recon/weather.py`.
+`daily.time` is plain `YYYY-MM-DD`; arrays are parallel; `precipitation_sum`
+can be `null`. Wind > 25 kph is worth flagging for exposed coastal/ridge
+sites. Full WMO mapping in `recon/weather.py`.

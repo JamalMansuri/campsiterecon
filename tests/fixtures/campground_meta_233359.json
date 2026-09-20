@@ -1,0 +1,15 @@
+{
+ "campground": {
+  "facility_id": "233359",
+  "facility_latitude": 38.04121,
+  "facility_longitude": -122.800354,
+  "facility_name": "Point Reyes National Seashore Campground",
+  "facility_reservation_url": "",
+  "facility_time_zone": "America/Los_Angeles",
+  "facility_type": "STANDARD",
+  "is_deactivated": false,
+  "legacy_facility_id": "72393",
+  "parent_asset_id": "2864",
+  "stay_limit": ""
+ }
+}

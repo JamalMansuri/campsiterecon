@@ -1,0 +1,319 @@
+{
+ "captured": "2026-09-20",
+ "recareas": {
+  "1067": "Los Padres National Forest",
+  "2864": "Point Reyes National Seashore",
+  "2893": "Pinnacles National Park",
+  "2931": "Sequoia & Kings Canyon National Parks"
+ },
+ "recgov_meta": {
+  "10044710": {
+   "facility_id": "10044710",
+   "facility_latitude": 36.464744,
+   "facility_longitude": -118.667181,
+   "facility_name": "Atwell Mill Campground",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "10044761": {
+   "facility_id": "10044761",
+   "facility_latitude": 36.784487,
+   "facility_longitude": -118.661091,
+   "facility_name": "Moraine Campground (CA)",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "10044765": {
+   "facility_id": "10044765",
+   "facility_latitude": 36.784503,
+   "facility_longitude": -118.661089,
+   "facility_name": "Sheep Creek Campground",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "10124445": {
+   "facility_id": "10124445",
+   "facility_latitude": 36.744675,
+   "facility_longitude": -118.961786,
+   "facility_name": "Crystal Springs Campground (CA)",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "10124502": {
+   "facility_id": "10124502",
+   "facility_latitude": 36.743529,
+   "facility_longitude": -118.965325,
+   "facility_name": "Azalea Campground",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "231959": {
+   "facility_id": "231959",
+   "facility_latitude": 35.9172222,
+   "facility_longitude": -121.465,
+   "facility_name": "PLASKETT CREEK CAMPGROUND",
+   "is_deactivated": false,
+   "parent_asset_id": "1067"
+  },
+  "232460": {
+   "facility_id": "232460",
+   "facility_latitude": 36.6361111,
+   "facility_longitude": -118.8097222,
+   "facility_name": "Dorst Creek Campground-Sequoia and Kings Canyon National Park",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "232461": {
+   "facility_id": "232461",
+   "facility_latitude": 36.6067111,
+   "facility_longitude": -118.7258,
+   "facility_name": "Lodgepole Campground-Sequoia and Kings Canyon National Park",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "233116": {
+   "facility_id": "233116",
+   "facility_latitude": 35.9916667,
+   "facility_longitude": -121.4941667,
+   "facility_name": "KIRK CREEK CAMPGROUND",
+   "is_deactivated": false,
+   "parent_asset_id": "1067"
+  },
+  "233118": {
+   "facility_id": "233118",
+   "facility_latitude": 36.005,
+   "facility_longitude": -121.3763889,
+   "facility_name": "PONDEROSA CAMPGROUND",
+   "is_deactivated": false,
+   "parent_asset_id": "1067"
+  },
+  "233359": {
+   "facility_id": "233359",
+   "facility_latitude": 38.04121,
+   "facility_longitude": -122.800354,
+   "facility_name": "Point Reyes National Seashore Campground",
+   "is_deactivated": false,
+   "parent_asset_id": "2864"
+  },
+  "234015": {
+   "facility_id": "234015",
+   "facility_latitude": 36.4663889,
+   "facility_longitude": -121.1761111,
+   "facility_name": "PINNACLES CAMPGROUND",
+   "is_deactivated": false,
+   "parent_asset_id": "2893"
+  },
+  "234752": {
+   "facility_id": "234752",
+   "facility_latitude": 36.7377778,
+   "facility_longitude": -118.9647222,
+   "facility_name": "SUNSET CAMPGROUND (CA)",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "246864": {
+   "facility_id": "246864",
+   "facility_latitude": 36.452103,
+   "facility_longitude": -118.612164,
+   "facility_name": "Cold Springs Campground (CA)",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "249979": {
+   "facility_id": "249979",
+   "facility_latitude": 36.5174444,
+   "facility_longitude": -118.800375,
+   "facility_name": "POTWISHA CAMPGROUND",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "249982": {
+   "facility_id": "249982",
+   "facility_latitude": 36.5210556,
+   "facility_longitude": -118.7625972,
+   "facility_name": "BUCKEYE FLAT CAMPGROUND",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  },
+  "253917": {
+   "facility_id": "253917",
+   "facility_latitude": 36.7902778,
+   "facility_longitude": -118.6719444,
+   "facility_name": "Sentinel Campground",
+   "is_deactivated": false,
+   "parent_asset_id": "2931"
+  }
+ },
+ "ridb": {
+  "10044710": {
+   "Enabled": true,
+   "FacilityID": "10044710",
+   "FacilityLatitude": 36.464744,
+   "FacilityLongitude": -118.667181,
+   "FacilityName": "Atwell Mill Campground",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "10044761": {
+   "Enabled": true,
+   "FacilityID": "10044761",
+   "FacilityLatitude": 36.784487,
+   "FacilityLongitude": -118.661091,
+   "FacilityName": "Moraine Campground (CA)",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "10044765": {
+   "Enabled": true,
+   "FacilityID": "10044765",
+   "FacilityLatitude": 36.784503,
+   "FacilityLongitude": -118.661089,
+   "FacilityName": "Sheep Creek Campground",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "10124445": {
+   "Enabled": true,
+   "FacilityID": "10124445",
+   "FacilityLatitude": 36.744675,
+   "FacilityLongitude": -118.961786,
+   "FacilityName": "Crystal Springs Campground (CA)",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "10124502": {
+   "Enabled": true,
+   "FacilityID": "10124502",
+   "FacilityLatitude": 36.743529,
+   "FacilityLongitude": -118.965325,
+   "FacilityName": "Azalea Campground",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "231959": {
+   "Enabled": true,
+   "FacilityID": "231959",
+   "FacilityLatitude": 35.9172222,
+   "FacilityLongitude": -121.465,
+   "FacilityName": "PLASKETT CREEK CAMPGROUND",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "1067",
+   "Reservable": true
+  },
+  "232460": {
+   "Enabled": true,
+   "FacilityID": "232460",
+   "FacilityLatitude": 36.6361111,
+   "FacilityLongitude": -118.8097222,
+   "FacilityName": "Dorst Creek Campground-Sequoia and Kings Canyon National Park",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "232461": {
+   "Enabled": true,
+   "FacilityID": "232461",
+   "FacilityLatitude": 36.6067111,
+   "FacilityLongitude": -118.7258,
+   "FacilityName": "Lodgepole Campground-Sequoia and Kings Canyon National Park",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "233116": {
+   "Enabled": true,
+   "FacilityID": "233116",
+   "FacilityLatitude": 35.9916667,
+   "FacilityLongitude": -121.4941667,
+   "FacilityName": "KIRK CREEK CAMPGROUND",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "1067",
+   "Reservable": true
+  },
+  "233118": {
+   "Enabled": true,
+   "FacilityID": "233118",
+   "FacilityLatitude": 36.005,
+   "FacilityLongitude": -121.3763889,
+   "FacilityName": "PONDEROSA CAMPGROUND",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "1067",
+   "Reservable": true
+  },
+  "233359": {
+   "Enabled": true,
+   "FacilityID": "233359",
+   "FacilityLatitude": 38.04121,
+   "FacilityLongitude": -122.800354,
+   "FacilityName": "Point Reyes National Seashore Campground",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2864",
+   "Reservable": true
+  },
+  "234015": {
+   "Enabled": true,
+   "FacilityID": "234015",
+   "FacilityLatitude": 36.4663889,
+   "FacilityLongitude": -121.1761111,
+   "FacilityName": "PINNACLES CAMPGROUND",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2893",
+   "Reservable": true
+  },
+  "234752": {
+   "Enabled": true,
+   "FacilityID": "234752",
+   "FacilityLatitude": 36.7377778,
+   "FacilityLongitude": -118.9647222,
+   "FacilityName": "SUNSET CAMPGROUND (CA)",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "246864": {
+   "Enabled": true,
+   "FacilityID": "246864",
+   "FacilityLatitude": 36.452103,
+   "FacilityLongitude": -118.612164,
+   "FacilityName": "Cold Springs Campground (CA)",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "249979": {
+   "Enabled": true,
+   "FacilityID": "249979",
+   "FacilityLatitude": 36.5174444,
+   "FacilityLongitude": -118.800375,
+   "FacilityName": "POTWISHA CAMPGROUND",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "249982": {
+   "Enabled": true,
+   "FacilityID": "249982",
+   "FacilityLatitude": 36.5210556,
+   "FacilityLongitude": -118.7625972,
+   "FacilityName": "BUCKEYE FLAT CAMPGROUND",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  },
+  "253917": {
+   "Enabled": true,
+   "FacilityID": "253917",
+   "FacilityLatitude": 36.7902778,
+   "FacilityLongitude": -118.6719444,
+   "FacilityName": "Sentinel Campground",
+   "FacilityTypeDescription": "Campground",
+   "ParentRecAreaID": "2931",
+   "Reservable": true
+  }
+ }
+}

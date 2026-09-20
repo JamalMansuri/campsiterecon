@@ -1,0 +1,29 @@
+name: CI
+
+# Offline test suite on GitHub-hosted runners. It is also the deploy gate: the Mac mini's
+# auto-deployer (deploy/auto_deploy.sh) only takes a commit on main whose checks are green.
+# Deliberately NO self-hosted runner: this repo is public, and a fork's pull request can
+# point a workflow at `runs-on: self-hosted` and run code on the machine that hosts it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: python -m pip install --quiet "pydantic>=2.5" "certifi>=2024.0" "pytest>=8.0"
+      - name: Run offline tests (includes the preset-id gate)
+        run: python -m pytest -q tests
+      - name: Shell syntax
+        run: bash -n deploy_jambot.sh && bash -n deploy/auto_deploy.sh && bash -n deploy/fetch_ridb_key.sh

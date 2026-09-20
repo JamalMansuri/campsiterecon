@@ -1,6 +1,6 @@
 # recon/config.py
 
-Static preset locations + their facility/permit IDs. Pure data — no logic. Two dataclasses and a top-level `LOCATIONS` dict.
+Static preset locations + their verified facility IDs. Pure data — no logic. Two dataclasses and a top-level `LOCATIONS` dict.
 
 [Source](../recon/config.py) · Wiki home: [README.md](README.md)
 
@@ -12,11 +12,12 @@ class Camp:
     name: str
     facility_id: str
     permit_id: str | None = None     # None = standard campground, no permit URL needed
+    loop: str | None = None          # restrict to campsites whose Rec.gov `loop` equals this
 
 @dataclass(frozen=True)
 class Location:
     name: str
-    lat: float                       # for weather.md
+    lat: float                       # for weather.md AND for --verify's distance check
     lon: float
     camps: tuple[Camp, ...]
 
@@ -25,48 +26,36 @@ LOCATIONS: dict[str, Location] = { ... }
 
 The dict key (e.g. `"point_reyes"`) is what the user passes to `--location` in [main.md](main.md).
 
-## Current presets
+## Current presets (all ids verified 2026-09-20)
 
-| Key | Location | Notes |
+| Key | Location | Camps |
 |---|---|---|
-| `point_reyes` | Point Reyes National Seashore | All 4 camps are wilderness permits — every `Camp` has a `permit_id` |
-| `big_sur` | Big Sur | Drive-in campgrounds, no permits |
-| `pinnacles` | Pinnacles National Park | Single campground |
-| `kings_canyon` | Kings Canyon National Park | 6 standard campgrounds |
-| `sequoia` | Sequoia National Park | 6 standard campgrounds |
+| `point_reyes` | Point Reyes National Seashore | Sky, Coast, Glen, Wildcat — **one facility (233359), four `loop` values**. Booked like any campsite; no permit. |
+| `big_sur` | Big Sur | Kirk Creek 233116, Plaskett Creek 231959, Ponderosa 233118 (Los Padres NF) |
+| `pinnacles` | Pinnacles National Park | 234015 |
+| `kings_canyon` | Kings Canyon National Park | 6 campgrounds |
+| `sequoia` | Sequoia National Park | 6 campgrounds |
 
-## Why a code constant, not a config file
+## The `loop` field
 
-- IDs are stable. Recreation.gov rarely changes them.
-- The list is small (~20 camps) and fits comfortably in a 60-line file.
-- Frozen dataclasses give type safety the LLM and IDE can both check.
-- No I/O at startup, no parsing errors, no schema migration.
+Rec.gov models Point Reyes as a single campground whose campsites carry `loop: "Sky"` / `"Coast"` / `"Glen"` / `"Wildcat"` (plus two boat-in Tomales Bay loops that the preset leaves out). Four `Camp` entries share `facility_id="233359"` and differ only by `loop`; [parser.md](parser.md) filters campsites case-insensitively on it, and [api_client.md](api_client.md)'s cache means the month is fetched once, not four times.
 
-If presets ever grow past ~50 entries or need user-customization, *then* move to YAML / JSON. Until then, the code constant wins.
+## The `Location` lat/lon is a reference point, not every camp
+
+Weather is fetched once per location from `Location.lat/lon`, and `--verify` only checks each camp is within 150 km of it. Kings Canyon's point is Grant Grove (~2,000 m) while Sentinel / Moraine / Sheep Creek are 27 km east at Cedar Grove (~1,400 m); Sequoia's point is Lodgepole (~2,050 m) while Potwisha / Buckeye Flat are in the Foothills (~600 m). SKILL.md tells the LLM to name the reference point for those camps. If per-camp forecasts are ever wanted, the verified coordinates are already recorded in `tests/fixtures/presets/directory.json` — add `lat`/`lon` to `Camp` and fetch per distinct coordinate, or split the presets (grant_grove / cedar_grove, lodgepole / foothills).
+
+## What the presets deliberately exclude
+
+California State Parks (Pfeiffer Big Sur, Andrew Molera, Limekiln, Julia Pfeiffer Burns, Mt Tam, Samuel P. Taylor, Henry Cowell, Butano) are booked through ReserveCalifornia and do not exist on Recreation.gov. Earlier versions of this file listed three of them under Big Sur with ids that actually pointed at campgrounds in New Mexico and Oregon.
 
 ## How to add a preset
 
-1. Look up facility IDs on RIDB (the [campsite_api_checker.ipynb](../campsite_api_checker.ipynb) notebook is the easiest tool for this — query by name, copy the `FacilityID`).
-2. For permit camps, also grab the permit ID from `recreation.gov/permits/{id}`.
-3. Add an entry to `LOCATIONS`:
-   ```python
-   "joshua_tree": Location(
-       name="Joshua Tree National Park",
-       lat=33.873, lon=-115.901,
-       camps=(
-           Camp("Jumbo Rocks", "232489"),
-           Camp("Hidden Valley", "232485"),
-       ),
-   ),
-   ```
-4. Update the `--location` choices in [SKILL.md](../SKILL.md) Mode 1 if the LLM should know about it.
+1. Look the id up on RIDB — `campsite_api_checker.ipynb` or a direct `GET /facilities?query=<name>` — and confirm the name with `GET https://www.recreation.gov/api/camps/campgrounds/<id>`. **Never type an id from memory.**
+2. If the camp is one loop of a bigger facility, fetch a month of availability and copy the exact `loop` string.
+3. Add the entry to `LOCATIONS`.
+4. Run `python main.py --verify` — it must print `"ok": true`. See [verify.md](verify.md) for what it checks.
+5. Update the `--location` choices in [SKILL.md](../SKILL.md) Mode 1 and [../references/facility-ids.md](../references/facility-ids.md).
 
-No other files need to change. [availability.md](availability.md), [parser.md](parser.md), and [weather.md](weather.md) all consume `Location` / `Camp` generically.
+## Why a code constant, not a config file
 
-## Permit ID is the source of truth for booking URLs
-
-If a `Camp` has a `permit_id`, [parser.md](parser.md) will route its booking URL through `/permits/`, regardless of which endpoint actually returned the data. Setting `permit_id=None` for a permit camp is a bug that will hand the user a broken `/camping/` URL.
-
-## Reference
-
-For the full known-IDs list (presets and beyond), see [../references/facility-ids.md](../references/facility-ids.md).
+IDs are stable, the list is small, frozen dataclasses give type safety, and there's no I/O at startup. If presets ever grow past ~50 entries or need user-customization, move to YAML/JSON then.

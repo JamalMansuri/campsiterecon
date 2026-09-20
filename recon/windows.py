@@ -38,3 +38,16 @@ def consecutive_nights(available: set[date], nights: int) -> list[tuple[date, da
             checkout = date.fromordinal(run[i + nights - 1] + 1)
             out.append((start, checkout))
     return out
+
+
+def months_spanned(start: date, end: date) -> list[tuple[int, int]]:
+    """Every (year, month) from start's month to end's month inclusive."""
+    out: list[tuple[int, int]] = []
+    y, m = start.year, start.month
+    while (y, m) <= (end.year, end.month):
+        out.append((y, m))
+        m += 1
+        if m > 12:
+            m = 1
+            y += 1
+    return out

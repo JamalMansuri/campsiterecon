@@ -3,3 +3,4 @@ ipywidgets>=8.0
 certifi>=2024.0
 pydantic>=2.5
 playwright>=1.40
+pytest>=8.0

@@ -20,7 +20,7 @@ A run of length L produces `L - nights + 1` start positions. A 5-night run with 
 
 Two callers want this primitive in slightly different shapes:
 
-- [parser.md](parser.md) (weekend mode) calls it per-site to populate `windows_by_site_id`, *and* on the flat union to set the `contiguous` flag on `CampsiteResult`.
+- [parser.md](parser.md) (weekend mode) calls it per-site to populate `windows_by_site_id`; the `contiguous` flag is simply `bool(windows_by_site_id)` — never computed on the union across sites, since a 2-night stay has to be at one site.
 - [search.md](search.md) (search mode) calls it on the merged facility-level date set for the `contiguous` flag.
 - The Phase 3 auto-cart matcher (see [auto-cart-mvp-plan.md](auto-cart-mvp-plan.md)) will call it with arbitrary `nights` from `targets.json` rules.
 
@@ -39,7 +39,7 @@ Algorithm credited to banool/recreation-gov-campsite-checker — see [banool-att
 
 - **No date filtering.** The caller pre-filters to whichever window matters (Fri/Sat/Sun in weekend mode, the `--start..--end` range in search mode). This module only does run-detection.
 - **No status filtering.** Availability statuses are normalized via `is_available()` in [models.md](models.md) before reaching this module.
-- **No campsite-id awareness.** It operates on a flat `set[date]`. The caller decides whether to call once per site (preserving per-site granularity, what weekend mode does for `windows_by_site_id`) or once on a union (what search mode does for its single `contiguous` bool).
+- **No campsite-id awareness.** It operates on a flat `set[date]`. Both callers invoke it once per site; search mode's `contiguous` is `any(site has a window)`, and the union `available_dates` is only ever reported, never fed back in for contiguity.
 
 ## Upstream / downstream
 
@@ -67,3 +67,8 @@ consecutive_nights(avail, nights=3)
 consecutive_nights(avail, nights=4)
 # []                            # no run is 4+ nights
 ```
+
+
+## `months_spanned(start, end)`
+
+Second, smaller primitive in the same module: every `(year, month)` from `start`'s month to `end`'s month inclusive. Used by [search.md](search.md) for the query range and by [availability.md](availability.md) so a weekend that straddles a month boundary fetches both months.

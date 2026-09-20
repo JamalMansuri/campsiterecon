@@ -1,5 +1,7 @@
 import json
+import os
 import ssl
+import sys
 import certifi
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -20,6 +22,18 @@ _LABELS = {0: "friday", 1: "saturday", 2: "sunday"}
 
 
 def fetch_weekend_weather(lat: float, lon: float, friday: date) -> dict[str, WeatherDay]:
+    """Fri/Sat/Sun forecast, or {} — for weekends beyond Open-Meteo's ~14-day
+    horizon, on any network error, and for days the API fills with nulls.
+    Weather is decoration; it must never abort an availability run."""
+    try:
+        return _fetch(lat, lon, friday)
+    except Exception as e:                       # noqa: BLE001 — see docstring
+        if os.environ.get("CAMPSITESCOUT_DEBUG"):
+            print(f"[weather] {type(e).__name__}: {e}", file=sys.stderr)
+        return {}
+
+
+def _fetch(lat: float, lon: float, friday: date) -> dict[str, WeatherDay]:
     url = (
         f"https://api.open-meteo.com/v1/forecast"
         f"?latitude={lat}&longitude={lon}"
@@ -42,6 +56,10 @@ def fetch_weekend_weather(lat: float, lon: float, friday: date) -> dict[str, Wea
     for i, t in enumerate(times):
         label = targets.get(t)
         if not label:
+            continue
+        values = [daily.get(k, [None])[i] if i < len(daily.get(k, [])) else None
+                  for k in ("temperature_2m_max", "temperature_2m_min", "windspeed_10m_max", "weathercode")]
+        if any(v is None for v in values):      # Open-Meteo pads the horizon with nulls
             continue
         result[label] = WeatherDay(
             date      = t,

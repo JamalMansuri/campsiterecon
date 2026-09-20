@@ -1,0 +1,432 @@
+{
+ "campsites": {
+  "518310": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Available",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "Available"
+   },
+   "campsite_id": "518310",
+   "campsite_reserve_type": "Non Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "BOAT IN",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Tomales Bay",
+   "max_num_people": 6,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 6,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 8
+   },
+   "site": "BOAT A, 1-6 people",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "518311": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Available",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Available",
+    "2026-10-12T00:00:00Z": "Available"
+   },
+   "campsite_id": "518311",
+   "campsite_reserve_type": "Non Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "BOAT IN",
+   "capacity_rating": "Double",
+   "hide_external": false,
+   "loop": "Tomales Bay",
+   "max_num_people": 14,
+   "min_num_people": 7,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 8,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 5,
+    "2026-10-12T00:00:00Z": 8
+   },
+   "site": "BOAT B, 7-14 people",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79018": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "NYR",
+    "2026-10-09T00:00:00Z": "NYR",
+    "2026-10-10T00:00:00Z": "NYR",
+    "2026-10-11T00:00:00Z": "NYR",
+    "2026-10-12T00:00:00Z": "NYR"
+   },
+   "campsite_id": "79018",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {
+    "maxConsecutiveStay": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "consecutive nights",
+     "value": 1
+    },
+    "maxStay": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "Rolling 30 Days",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "nights",
+     "value": 1
+    },
+    "minConsecutiveStay": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "soft",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "consecutive nights",
+     "value": 1
+    },
+    "overrideFacilityStayRules": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "",
+     "value": 1
+    },
+    "reservationWindow": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "Days",
+     "value": 14
+    }
+   },
+   "campsite_type": "HIKE TO",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Wildcat",
+   "max_num_people": 6,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 1,
+    "2026-10-10T00:00:00Z": 1,
+    "2026-10-11T00:00:00Z": 1,
+    "2026-10-12T00:00:00Z": 1
+   },
+   "site": "008",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79021": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "NYR",
+    "2026-10-09T00:00:00Z": "NYR",
+    "2026-10-10T00:00:00Z": "NYR",
+    "2026-10-11T00:00:00Z": "NYR",
+    "2026-10-12T00:00:00Z": "NYR"
+   },
+   "campsite_id": "79021",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {
+    "reservationWindow": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "Days",
+     "value": 14
+    }
+   },
+   "campsite_type": "HIKE TO",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Glen",
+   "max_num_people": 6,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 1,
+    "2026-10-10T00:00:00Z": 1,
+    "2026-10-11T00:00:00Z": 1,
+    "2026-10-12T00:00:00Z": 1
+   },
+   "site": "012",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79026": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Reserved",
+    "2026-10-09T00:00:00Z": "Available",
+    "2026-10-10T00:00:00Z": "Available",
+    "2026-10-11T00:00:00Z": "Available",
+    "2026-10-12T00:00:00Z": "Reserved"
+   },
+   "campsite_id": "79026",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "HIKE TO",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Sky",
+   "max_num_people": 6,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 0
+   },
+   "site": "006",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79035": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Reserved",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Available",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "NYR"
+   },
+   "campsite_id": "79035",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "HIKE TO",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Sky",
+   "max_num_people": 6,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 1
+   },
+   "site": "008",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79050": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Open",
+    "2026-10-09T00:00:00Z": "Open",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "Closed"
+   },
+   "campsite_id": "79050",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "GROUP HIKE TO",
+   "capacity_rating": "N/A",
+   "hide_external": false,
+   "loop": "Coast",
+   "max_num_people": 25,
+   "min_num_people": 7,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 0,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 0
+   },
+   "site": "008 GROUP",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79071": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Reserved",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "Reserved"
+   },
+   "campsite_id": "79071",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "HIKE TO",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Wildcat",
+   "max_num_people": 4,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 0,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 0
+   },
+   "site": "005",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79077": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Available",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "Available"
+   },
+   "campsite_id": "79077",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "GROUP TENT ONLY AREA NONELECTRIC",
+   "capacity_rating": "",
+   "hide_external": false,
+   "loop": "Tomales Bay Boat Only",
+   "max_num_people": 25,
+   "min_num_people": 15,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 1
+   },
+   "site": "TOMALES BEACH GROUP, BOAT ONLY, 15-25 people",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79118": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Reserved",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "Reserved"
+   },
+   "campsite_id": "79118",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {
+    "maxConsecutiveStay": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "consecutive nights",
+     "value": 1
+    },
+    "maxStay": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "Rolling 30 Days",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "nights",
+     "value": 1
+    },
+    "minConsecutiveStay": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "soft",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "consecutive nights",
+     "value": 1
+    },
+    "overrideFacilityStayRules": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "",
+     "value": 1
+    },
+    "reservationWindow": {
+     "description": "",
+     "end_date": "0001-01-01T00:00:00Z",
+     "secondary_value": "",
+     "start_date": "0001-01-01T00:00:00Z",
+     "units": "Days",
+     "value": 14
+    }
+   },
+   "campsite_type": "HIKE TO",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Coast",
+   "max_num_people": 6,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 1,
+    "2026-10-10T00:00:00Z": 1,
+    "2026-10-11T00:00:00Z": 1,
+    "2026-10-12T00:00:00Z": 1
+   },
+   "site": "009",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79240": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Available",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "Available"
+   },
+   "campsite_id": "79240",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "GROUP TENT ONLY AREA NONELECTRIC",
+   "capacity_rating": "",
+   "hide_external": false,
+   "loop": "Tomales Bay Boat Only",
+   "max_num_people": 25,
+   "min_num_people": 15,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 1
+   },
+   "site": "MARSHALL BEACH GROUP 2,  BOAT ONLY, 15-25 people",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  },
+  "79267": {
+   "availabilities": {
+    "2026-10-08T00:00:00Z": "Available",
+    "2026-10-09T00:00:00Z": "Reserved",
+    "2026-10-10T00:00:00Z": "Reserved",
+    "2026-10-11T00:00:00Z": "Reserved",
+    "2026-10-12T00:00:00Z": "Available"
+   },
+   "campsite_id": "79267",
+   "campsite_reserve_type": "Site-Specific",
+   "campsite_rules": {},
+   "campsite_type": "HIKE TO",
+   "capacity_rating": "Single",
+   "hide_external": false,
+   "loop": "Glen",
+   "max_num_people": 6,
+   "min_num_people": 1,
+   "quantities": {
+    "2026-10-08T00:00:00Z": 1,
+    "2026-10-09T00:00:00Z": 0,
+    "2026-10-10T00:00:00Z": 0,
+    "2026-10-11T00:00:00Z": 0,
+    "2026-10-12T00:00:00Z": 1
+   },
+   "site": "003",
+   "supplemental_camping": {},
+   "type_of_use": "Overnight"
+  }
+ },
+ "count": 12
+}

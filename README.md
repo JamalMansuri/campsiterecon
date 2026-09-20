@@ -4,7 +4,7 @@ A small Python CLI and OpenClaw skill that checks **Recreation.gov campsite and 
 
 **Three modes:**
 
-1. **Weekend recon** — preset Bay Area / Central California locations (Point Reyes wilderness permits, Big Sur, Pinnacles, Kings Canyon, Sequoia) for the upcoming weekend, with weather (Recreation.gov + Open-Meteo).
+1. **Weekend recon** — preset Bay Area / Central California locations (Point Reyes hike-in camps, Big Sur, Pinnacles, Kings Canyon, Sequoia) for the upcoming weekend, with weather (Recreation.gov + Open-Meteo).
 2. **Free-text search** — any location (e.g. "Yosemite", "Tahoe", "Joshua Tree", "Zion") over an arbitrary date range, no weather. For planning trips months ahead.
 3. **Watch (cron)** — daily check of a specific location with a rolling date window. Notifies only when sites open; silent otherwise. Full install walkthrough in [SKILL.md](SKILL.md) Mode 3.
 
@@ -18,7 +18,7 @@ Typical queries, phrased how a user would actually type them:
 - "Find me an open Yosemite campground over July 4th"
 - "Check Big Sur next weekend and tell me the weather"
 - "Watch Sequoia daily and ping me when a site opens up"
-- "Are wilderness permits available for Coast Camp?"
+- "Is Coast Camp open Saturday night?"
 - "Is Kirk Creek bookable Sat+Sun?"
 
 If you're looking to monitor Recreation.gov availability from the command line — or to drop that ability into an LLM agent loop (OpenClaw, Claude Code, any shell-capable agent) and pipe the results into Telegram — this repo is the minimum viable version.
@@ -73,12 +73,13 @@ Each row links to source and to a per-module wiki page. The wiki ([docs/](docs/)
 |---|---|---|
 | [main.py](main.py) | [docs/main.md](docs/main.md) | CLI entry point. Loads API key, routes between weekend + search modes, prints JSON to stdout |
 | [recon/api_client.py](recon/api_client.py) | [docs/api_client.md](docs/api_client.md) | HTTP transport. Rec.gov availability endpoints + RIDB facility search. Knows nothing about campsites |
-| [recon/availability.py](recon/availability.py) | [docs/availability.md](docs/availability.md) | Weekend mode: decides which endpoint to call; handles campground → permit fallback |
+| [recon/availability.py](recon/availability.py) | [docs/availability.md](docs/availability.md) | Weekend mode: decides which endpoint to call, attaches Rec.gov's facility metadata |
 | [recon/parser.py](recon/parser.py) | [docs/parser.md](docs/parser.md) | Weekend mode: transforms raw responses into `CampsiteResult`, flags contiguous nights, guards permit URLs |
 | [recon/search.py](recon/search.py) | [docs/search.md](docs/search.md) | Search mode: RIDB query → facility list → multi-month availability scan → `SearchReport` |
 | [recon/windows.py](recon/windows.py) | [docs/windows.md](docs/windows.md) | Pure date primitive — enumerates viable N-night `(start, checkout)` windows. Used by parser, search, and the future auto-cart matcher |
 | [recon/weather.py](recon/weather.py) | [docs/weather.md](docs/weather.md) | Fetches Fri/Sat/Sun forecast from Open-Meteo. Returns `WeatherDay` per day |
-| [recon/config.py](recon/config.py) | [docs/config.md](docs/config.md) | Preset location definitions with facility + permit IDs. Add new presets here only |
+| [recon/config.py](recon/config.py) | [docs/config.md](docs/config.md) | Preset location definitions with verified facility IDs (and `loop` for multi-camp facilities). Add new presets here only |
+| [recon/verify.py](recon/verify.py) | [docs/verify.md](docs/verify.md) | `--verify`: checks every preset id against RIDB + Rec.gov |
 | [recon/models.py](recon/models.py) | [docs/models.md](docs/models.md) | Data contracts — `CampsiteResult`, `WeatherDay`, `LocationReport`, `SearchResult`, `SearchReport` |
 | [SKILL.md](SKILL.md) | — | OpenClaw skill definition — copy to `~/.openclaw/skills/campsite-recon/` |
 
@@ -86,15 +87,21 @@ Each row links to source and to a per-module wiki page. The wiki ([docs/](docs/)
 
 | Key | Location |
 |---|---|
-| `point_reyes` | Point Reyes National Seashore (wilderness permits) |
-| `big_sur` | Big Sur (drive-in campgrounds) |
+| `point_reyes` | Point Reyes National Seashore — Sky, Coast, Glen, Wildcat hike-in camps (one Rec.gov campground, four loops) |
+| `big_sur` | Big Sur — Kirk Creek, Plaskett Creek, Ponderosa (Los Padres NF) |
 | `pinnacles` | Pinnacles National Park |
 | `kings_canyon` | Kings Canyon National Park |
 | `sequoia` | Sequoia National Park |
 
-To add a preset: look up the facility IDs on RIDB, add an entry to [recon/config.py](recon/config.py). Nothing else needs changing.
+To add a preset: look up the facility ID on RIDB (never from memory), add an entry to [recon/config.py](recon/config.py), then run `python main.py --verify` — it cross-checks every preset against RIDB and Rec.gov (id resolves, key word of the name matches, within 150 km of the preset, right type, loop present) and exits 1 on a mismatch.
+
+California State Parks (Pfeiffer Big Sur, Andrew Molera, Limekiln, Mt Tam, Samuel P. Taylor, …) book through ReserveCalifornia, not Recreation.gov, so they can't be presets or search results.
 
 To check a location that isn't a preset, use search mode — no code change required.
+
+## Deploying to the Mac mini
+
+Production runs from a separate clone on the JamBot Mac mini, and OpenClaw loads its own copy of `SKILL.md`, so a change is not live until that box has it. The pipeline is: push to `main` → [CI](.github/workflows/ci.yml) runs the offline suite on GitHub → a LaunchAgent on the box ([deploy/auto_deploy.sh](deploy/auto_deploy.sh), every 15 min, outbound only) sees a new green commit → [deploy_jambot.sh](deploy_jambot.sh) fast-forwards, re-tests (rolling back on failure), installs `SKILL.md` → the OpenClaw gateway restarts. One-time setup and the reasoning (why not a self-hosted runner on a public repo) are in [docs/deploy.md](docs/deploy.md).
 
 ## Usage
 
@@ -121,18 +128,28 @@ python main.py --search "Yosemite" --start 2026-07-03 --end 2026-07-05
 python main.py --search "Tahoe" --start 2026-07-30 --end 2026-08-02
 ```
 
-Search mode only hits the Recreation.gov campground endpoint — wilderness-permit-only facilities (Point Reyes pattern) are skipped. For those, use a preset.
+Search mode pages through every RIDB match (RIDB caps pages at 50) and reports where each campground actually is (`rec_area`) — a "Yosemite" search legitimately returns Stanislaus NF and BLM Merced River campgrounds too. Wilderness permits (Yosemite Wilderness, Half Dome) are skipped.
+
+**Verify + debug:**
+
+```bash
+# Cross-check every preset facility id against RIDB and Rec.gov; exit 1 on any mismatch
+python main.py --verify
+
+# Show the HTTP errors the client normally swallows (e.g. Rec.gov's 429 throttle)
+python main.py --debug --location big_sur
+```
+
+Failed fetches are never reported as "no availability": both report shapes carry `unreachable[]` and `warnings[]`.
 
 **Watch mode** — cron-driven notifications, only when sites open:
 
 Mode 3 is orchestration rather than a new CLI flag. You wrap the search-mode command in a crontab line that gates notifications on non-empty results with `jq`, so you never see "nothing available" noise — you only hear from it when a site actually opens. Install walkthrough lives in [SKILL.md](SKILL.md) Mode 3; short version:
 
 ```bash
-# Daily at 8am, scan the next 30 days for Yosemite, notify only when results[] is non-empty
-0 8 * * * cd /path/to/campsitescout && /usr/bin/env python3 main.py --search "Yosemite" \
-  --start $(date -v+1d +\%Y-\%m-\%d) --end $(date -v+30d +\%Y-\%m-\%d) \
-  | /opt/homebrew/bin/jq -e '.results | length > 0' >/dev/null \
-  && osascript -e 'display notification "Open sites for Yosemite" with title "🏕 Campsite Scout"'
+# Daily at 8am, scan the next 30 days for Yosemite, notify only when results[] is non-empty.
+# One line (crontab has no line continuation); substitute the absolute jq path from `command -v jq`.
+0 8 * * * cd /path/to/campsitescout && ./.venv/bin/python main.py --search "Yosemite" --start $(date -v+1d +\%Y-\%m-\%d) --end $(date -v+30d +\%Y-\%m-\%d) 2>>/tmp/campsitescout.err | tee -a /tmp/campsitescout.log | /usr/bin/jq -e '.results | length > 0' >/dev/null && /usr/bin/osascript -e 'display notification "Open sites found for Yosemite" with title "🏕 Campsite Scout"'
 ```
 
 Swap `osascript` for a `curl` to a Telegram bot's `sendMessage` endpoint to route notifications into chat instead of a macOS banner. Cron only fires while the machine is awake — for 24/7 watching, host this on a server or GitHub Actions.

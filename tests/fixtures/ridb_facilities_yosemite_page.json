@@ -1,0 +1,63 @@
+{
+ "METADATA": {
+  "RESULTS": {
+   "CURRENT_COUNT": 4,
+   "TOTAL_COUNT": 43
+  },
+  "SEARCH_PARAMETERS": {
+   "LIMIT": 25,
+   "OFFSET": 0,
+   "QUERY": "Yosemite"
+  }
+ },
+ "RECDATA": [
+  {
+   "Enabled": true,
+   "FacilityID": "445859",
+   "FacilityLatitude": 37.84883288,
+   "FacilityLongitude": -119.5571873,
+   "FacilityName": "Yosemite National Park Wilderness Permits",
+   "FacilityTypeDescription": "Permit",
+   "LegacyFacilityID": "",
+   "ParentRecAreaID": "2991",
+   "RECAREA": [],
+   "Reservable": true
+  },
+  {
+   "Enabled": true,
+   "FacilityID": "232452",
+   "FacilityLatitude": 37.7638889,
+   "FacilityLongitude": -119.8444444,
+   "FacilityName": "Crane Flat Campground",
+   "FacilityTypeDescription": "Campground",
+   "LegacyFacilityID": "70930",
+   "ParentRecAreaID": "2991",
+   "RECAREA": [],
+   "Reservable": true
+  },
+  {
+   "Enabled": true,
+   "FacilityID": "232446",
+   "FacilityLatitude": 37.5730556,
+   "FacilityLongitude": -119.665,
+   "FacilityName": "Wawona Campground",
+   "FacilityTypeDescription": "Campground",
+   "LegacyFacilityID": "70924",
+   "ParentRecAreaID": "2991",
+   "RECAREA": [],
+   "Reservable": true
+  },
+  {
+   "Enabled": true,
+   "FacilityID": "10091718",
+   "FacilityLatitude": 37.537154,
+   "FacilityLongitude": -119.655392,
+   "FacilityName": "Wawona Visitor Center at Hill's Studio",
+   "FacilityTypeDescription": "Visitor Center",
+   "LegacyFacilityID": "",
+   "ParentRecAreaID": "2991",
+   "RECAREA": [],
+   "Reservable": false
+  }
+ ]
+}
