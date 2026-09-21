@@ -51,6 +51,7 @@ Telegram → OpenClaw → main.py
 | [camply-attribution.md](camply-attribution.md) | Borrowed: `RawCampgroundResponse`/`RawSiteAvailability` shapes + the unavailable-status denylist. No runtime dep |
 | [banool-attribution.md](banool-attribution.md) | Borrowed: the `consecutive_nights` algorithm powering [windows.md](windows.md). No runtime dep |
 | [auto-cart-mvp-plan.md](auto-cart-mvp-plan.md) | The Playwright auto-cart MVP plan + Phase tracker |
+| [roadmap.md](roadmap.md) | Proposed features (party size, hot-watch, ReserveCalifornia, smoke/AQI, …) with researched constraints and first steps. Nothing in it is built |
 
 ## Where to start by question
 
