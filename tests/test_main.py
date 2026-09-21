@@ -98,3 +98,38 @@ def test_1password_key_cache_wins_over_keychain_and_env(monkeypatch, tmp_path):
     assert m._get_api_key() == "cached-from-1password"
     f.write_text("   \n")                                 # an empty cache must not mask the other sources
     assert m._get_api_key() == "keychain-key"
+
+
+def test_all_site_types_flag_reaches_search(monkeypatch, capsys):
+    import main as m
+    seen = {}
+    def fake_search(client, query, start, end, *, include_all_site_types=False):   # keyword-only: a positional call must fail
+        seen["flag"] = include_all_site_types
+        from recon.models import SearchReport
+        return SearchReport(query=query, start=start.isoformat(), end=end.isoformat(), results=[])
+    monkeypatch.setattr(m, "search", fake_search)
+    monkeypatch.setattr(m, "_get_api_key", lambda: "k")
+    for argv, expected in ((["main.py", "--search", "x", "--start", "2026-10-09", "--end", "2026-10-10"], False),
+                           (["main.py", "--search", "x", "--start", "2026-10-09", "--end", "2026-10-10", "--all-site-types"], True)):
+        monkeypatch.setattr(m.sys, "argv", argv)
+        m.main()
+        assert seen["flag"] is expected
+    assert '"site_types": "standard"' in capsys.readouterr().out
+
+
+def test_all_site_types_flag_end_to_end(monkeypatch, capsys):
+    import main as m
+    from tests.test_search import AnchoredClient, _fac, _mixed
+    monkeypatch.setattr(m, "RecGovClient", lambda *a, **k: AnchoredClient([_fac("9", "X")], 1, months={"9": _mixed()}))
+    monkeypatch.setattr(m, "_get_api_key", lambda: "k")
+    base = ["main.py", "--search", "x", "--start", "2026-10-09", "--end", "2026-10-11"]
+    monkeypatch.setattr(m.sys, "argv", base)
+    m.main()
+    default = json.loads(capsys.readouterr().out)
+    monkeypatch.setattr(m.sys, "argv", base + ["--all-site-types"])
+    m.main()
+    everything = json.loads(capsys.readouterr().out)
+    assert default["site_types"] == "standard" and default["results"][0]["open_site_count"] == 1
+    assert default["results"][0]["excluded_open_sites"] == {"boat_in": 2, "group": 1}
+    assert everything["site_types"] == "all" and everything["results"][0]["open_site_count"] == 4
+    assert everything["results"][0]["special_open_sites"] == {"boat_in": 2, "group": 1}

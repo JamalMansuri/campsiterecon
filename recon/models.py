@@ -192,6 +192,7 @@ class SearchSite(BaseModel):
     site: str | None = None
     loop: str | None = None
     campsite_type: str | None = None   # e.g. "STANDARD NONELECTRIC", "GROUP HIKE TO" — say when it's group-only
+    category: str | None = None        # "group" | "boat_in" | None (ordinary). Only ever non-null with --all-site-types
     min_people: int | None = None
     max_people: int | None = None
     dates: list[str]
@@ -207,7 +208,9 @@ class SearchResult(BaseModel):
     longitude: float | None = None
     distance_km: float | None = None   # from the query's rec area (`anchor`), when one was resolved
     available_dates: list[str]
-    open_site_count: int = 0
+    open_site_count: int = 0           # sites counted toward this result (group / boat-in excluded unless asked for)
+    excluded_open_sites: dict[str, int] = Field(default_factory=dict)  # {"group": n, "boat_in": m} open but not counted
+    special_open_sites: dict[str, int] = Field(default_factory=dict)   # --all-site-types only: group / boat-in sites that ARE counted
     skipped_sites: int = 0             # campsite records with an unrecognised shape, ignored
     sample_sites: list[SearchSite] = Field(default_factory=list)  # up to 5: any site with a 2-night window first, then most open nights
     stay_rules: StayRules | None = None
@@ -219,12 +222,14 @@ class SearchReport(BaseModel):
     query: str
     start: str
     end: str
+    site_types: str = "standard"       # "standard" = group + boat-in sites skipped (default); "all" = --all-site-types
     anchor: str | None = None          # rec area the query resolved to; distances/filtering are relative to it
     facilities_total: int = 0          # RIDB TOTAL_COUNT for the query
     facilities_scanned: int = 0        # how many of those we actually checked
     skipped_far: list[str] = Field(default_factory=list)  # matched the keyword but > 150 km from the anchor; not checked
     unreachable: list[str] = Field(default_factory=list)  # facilities whose availability fetch failed
     partial: list[str] = Field(default_factory=list)      # facilities with one or more months unchecked
+    group_or_boat_only: list[str] = Field(default_factory=list)  # open, but only at group / boat-in sites — not in results
     warnings: list[str] = Field(default_factory=list)     # e.g. Rec.gov rate-limited this run
     results: list[SearchResult]
 

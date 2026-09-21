@@ -2,7 +2,9 @@ from datetime import date, timedelta
 from .api_client import RecGovClient
 from .geo import haversine_km
 from .models import RawSiteAvailability, SearchResult, SearchReport, SearchSite
-from .parser import campground_url, collect_open_sites, site_url, stay_rules_from_meta, validate_campground
+from .parser import (
+    campground_url, collect_open_sites, site_category, site_url, stay_rules_from_meta, validate_campground,
+)
 from .windows import consecutive_nights, months_spanned as _months_spanned
 
 _SEARCH_NIGHTS   = 2
@@ -44,8 +46,34 @@ def _site_has_window(dates: set[date]) -> bool:
     return bool(consecutive_nights(dates, _SEARCH_NIGHTS))
 
 
+def _represent_categories(best: list, ranked: list, categories: dict[str, str | None]) -> list:
+    """--all-site-types only: someone asking for a group or boat-in site must be able to see one.
+    Swap the best-ranked site of any special category missing from the samples into a tail slot.
+    Index 0 is never touched (it stays the site to link when `contiguous` is true), and a slot
+    holding the sole sample of another special category is never evicted."""
+    rest = ranked[len(best):]
+    for category in sorted({c for c in categories.values() if c}):
+        if any(categories[sid] == category for sid, _ in best):
+            continue
+        candidate = next((item for item in rest if categories[item[0]] == category), None)
+        if candidate is None:
+            continue
+        for slot in range(len(best) - 1, 0, -1):
+            occupant = categories[best[slot][0]]
+            if occupant is None or sum(1 for sid, _ in best if categories[sid] == occupant) > 1:
+                best[slot] = candidate
+                break
+    return best
+
+
 def search(client: RecGovClient, query: str, start: date, end: date,
-           max_results: int = 150, max_distance_km: float = _MAX_DISTANCE_KM) -> SearchReport:
+           max_results: int = 150, max_distance_km: float = _MAX_DISTANCE_KM,
+           include_all_site_types: bool = False) -> SearchReport:
+    """By default group and boat-in campsites are left out of every count,
+    date, sample and the `contiguous` flag — an ordinary camper cannot book
+    them, and a facility whose only openings are such sites would otherwise
+    look available (and fire the Mode 3 cron gate). They are still reported:
+    `excluded_open_sites` per result, `group_or_boat_only` per report."""
     facilities, total = client.ridb_search_campgrounds(query, max_results=max_results)
     ridb_error = getattr(client, "last_error", None) if not facilities else None
     anchor  = client.ridb_search_recarea(query)
@@ -56,6 +84,7 @@ def search(client: RecGovClient, query: str, start: date, end: date,
     skipped_far: list[str]          = []
     unreachable: list[str]          = []
     partial:     list[str]          = []
+    special_only: list[str]         = []
     warnings:    list[str]          = []
     scanned = 0
 
@@ -108,14 +137,34 @@ def search(client: RecGovClient, query: str, start: date, end: date,
         if skipped:
             skipped_total += skipped
             skipped_facilities += 1
+
+        # Categorise every open site ONCE, after months are merged (so a site open in two months
+        # counts once). Default: group / boat-in sites leave `opened`. --all-site-types: they stay,
+        # and are reported as special_open_sites + SearchSite.category instead.
+        categories = {sid: site_category(site) for sid, (site, _) in opened.items()}
+        special: dict[str, int] = {}
+        for category in categories.values():
+            if category:
+                special[category] = special.get(category, 0) + 1
+        excluded: dict[str, int] = {}
+        if not include_all_site_types:
+            excluded = special
+            for sid, category in categories.items():
+                if category:
+                    del opened[sid]
         if not opened:
+            if excluded:
+                kinds = " + ".join(f"{n} {k.replace('_', '-')}" for k, n in sorted(excluded.items()))
+                special_only.append(f"{name} ({kinds} site{'s' if sum(excluded.values()) != 1 else ''} only)")
             continue
 
         flat: set[date] = set().union(*(dates for _, dates in opened.values()))
         # Any site that hosts a 2-night window comes first, so `contiguous: true`
         # is always backed by a named, linkable site in sample_sites.
-        best = sorted(opened.items(),
-                      key=lambda kv: (not _site_has_window(kv[1][1]), -len(kv[1][1]), kv[0]))[:_SAMPLE_SITES]
+        ranked = sorted(opened.items(), key=lambda kv: (not _site_has_window(kv[1][1]), -len(kv[1][1]), kv[0]))
+        best = ranked[:_SAMPLE_SITES]
+        if include_all_site_types:
+            best = _represent_categories(best, ranked, categories)
 
         results.append(SearchResult(
             name            = name,
@@ -127,10 +176,12 @@ def search(client: RecGovClient, query: str, start: date, end: date,
             distance_km     = distance,
             available_dates = sorted(d.isoformat() for d in flat),
             open_site_count = len(opened),
+            excluded_open_sites = dict(sorted(excluded.items())),
+            special_open_sites  = dict(sorted(special.items())) if include_all_site_types else {},
             skipped_sites   = skipped,
             sample_sites    = [
                 SearchSite(campsite_id=sid, site=site.site, loop=site.loop, campsite_type=site.campsite_type,
-                           min_people=site.min_num_people, max_people=site.max_num_people,
+                           category=categories.get(sid), min_people=site.min_num_people, max_people=site.max_num_people,
                            dates=sorted(d.isoformat() for d in dates), url=site_url(sid))
                 for sid, (site, dates) in best
             ],
@@ -149,12 +200,14 @@ def search(client: RecGovClient, query: str, start: date, end: date,
         query              = query,
         start              = start.isoformat(),
         end                = end.isoformat(),
+        site_types         = "all" if include_all_site_types else "standard",
         anchor             = anchor["name"] if anchor else None,
         facilities_total   = total,
         facilities_scanned = scanned,
         skipped_far        = skipped_far,
         unreachable        = unreachable,
         partial            = partial,
+        group_or_boat_only = special_only,
         warnings           = warnings + rate_limit_warning(client, len(unreachable)),
         results            = results,
     )

@@ -23,6 +23,18 @@ Returns a `SearchReport` (see [models.md](models.md)) with `results[]`, plus `fa
 6. **Emit** a `SearchResult` per facility with at least one open night: display name (title-cased only when RIDB shouts), `official_name`, `rec_area` (one cached `/recareas/{id}` call per distinct parent), lat/lon, `distance_km`, `open_site_count`, `stay_rules` (one keyless `/api/camps/campgrounds/{id}` call per facility *with* openings), and `sample_sites` — the 5 sites with the most open nights, each with `campsite_type`, `min/max_people` and a `site_url` deep link. Results are sorted by distance from the anchor. An unreachable facility carries its reason: `"Name (HTTP 404)"`.
 7. `warnings[]` gets a line if RIDB itself failed (bad key → HTTP 401/403 used to look like "no campgrounds"), if a later RIDB page failed (list truncated), if malformed campsite records were skipped, or if the client tripped its 429 breaker mid-run.
 
+## Group and boat-in sites are skipped by default
+
+After collecting open sites, `search()` drops every site whose [`site_category()`](parser.md) is `"group"` or `"boat_in"` — from `available_dates`, `open_site_count`, `sample_sites` and the `contiguous` test. A family looking for a campsite cannot book a 7–25-person group site or a beach reachable only by kayak, and before this a facility whose only opening was such a site looked available (and fired the Mode 3 cron gate: "Pines Group Stanislaus" for a Yosemite watch).
+
+Nothing disappears silently:
+
+- `SearchResult.excluded_open_sites` — `{"group": n, "boat_in": m}`, open sites that were not counted.
+- `SearchReport.group_or_boat_only` — facilities with openings *only* at such sites; they are not in `results`.
+- `SearchReport.site_types` — `"standard"` or `"all"`, so the consumer knows which mode produced the JSON.
+
+`--all-site-types` (→ `include_all_site_types=True`) turns the filter off. Those sites are then counted like any other, and because the person asking for them needs to find them, each result carries `special_open_sites` (`{"group": n, "boat_in": m}`), every `SearchSite` carries `category`, and `_represent_categories` swaps the best site of any open-but-unsampled category into a tail sample slot — never index 0, which stays the site to link when `contiguous` is true. Categories are computed once per facility, after months are merged, so a site open in two months counts once. Equestrian, cabin, yurt and RV-only types are **not** filtered — only what `site_category` names. Weekend mode does not filter at all: its presets are curated (Point Reyes' boat-in loops are simply not presets) and `site_details.campsite_type` carries the information.
+
 ## `contiguous` is per site
 
 `any(consecutive_nights(dates, 2) for each open site)` — a 2-night stay has to be at one site. The facility-level union (`available_dates`) can show two consecutive nights that belong to two different sites; that is two one-night trips, and `contiguous` is `False` for it. Same rule as [parser.md](parser.md).

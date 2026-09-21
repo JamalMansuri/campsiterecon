@@ -25,9 +25,9 @@ metadata:
 3. **`available_dates` are nights.** "2026-10-09" means the night of Fri Oct 9 → checkout Sat morning. `--end` is the last *night*, so checkout is the morning after it. A weekend needs two nights (Fri + Sat). `contiguous: true` means at least one single site has two consecutive open nights; `windows_by_site_id` lists the exact `[first_night, checkout]` pairs per site. Two different sites open on two different nights is **not** contiguous — say "one-night openings".
 4. **"Unreachable" is not "full".** If `unreachable` or `warnings` is non-empty, say which camps could not be checked and why. A rate-limit warning names the time before which retrying is pointless — do **not** offer to "try again now"; every early request extends the block. Never tell the user those camps are booked.
 4b. **Respect `stay_rules`, including the policy.** When present, `min_nights` / `min_weekend_nights` / `min_holiday_weekend_nights` are Rec.gov's minimum stays and each has a `*_policy`: `strict` means Rec.gov refuses a shorter booking ("1 night open, but Kirk Creek requires 3 on holiday weekends — not bookable"); `soft` / `softAny` (or any other value, e.g. "Ignore Holidays") means a shorter orphan night *may* still go through at checkout ("1 night open; Kirk Creek prefers 2-night stays, so it may or may not let you book just the one"). Never call a non-strict minimum "not bookable".
-5. **Group, boat-in and equestrian sites are not ordinary campsites.** Check `campsite_type` in `site_details` / `sample_sites`; if the only open sites say `GROUP`, `BOAT`, or `HORSE`/`EQUESTRIAN`, say so ("Wildcat — group site only").
+5. **Group, boat-in and equestrian sites are not ordinary campsites.** Mode 2 (search) already leaves group and boat-in sites out of every count, date and `contiguous` flag; it tells you what it left out in `excluded_open_sites` ("plus 2 group sites and 1 boat-in site I didn't count") and lists facilities that were open *only* at such sites in `group_or_boat_only` — mention those in one line, never as availability. Mode 1 (presets) does **not** filter: check `campsite_type` in `site_details`, and if the only open sites say `GROUP`, say so ("Wildcat — group site only, 7–25 people"). Equestrian and cabin sites are never filtered in either mode; name the type when that is all that's open.
 6. **California State Parks are not on Recreation.gov** (Pfeiffer Big Sur, Andrew Molera, Limekiln, Julia Pfeiffer Burns, Mt Tam, Samuel P. Taylor, Henry Cowell, Butano, Angel Island). If asked, say they book through reservecalifornia.com and this tool cannot check them.
-7. Run the command exactly as written for the mode. No extra flags, no editing paths.
+7. Run the command exactly as written for the mode. The only flags you may add are the ones this file names (`--location`, `--date`, `--all-site-types`), each only under the condition stated for it. No editing paths.
 
 ## API key — handling the "no key found" error
 
@@ -123,7 +123,7 @@ Sun: 13°C / 9°C · Drizzle 🌧
 
 ## Mode 2 — Location search
 
-Required: location name + start date + end date. Ask for whichever is missing, then run **exactly this command** with no extra flags:
+Required: location name + start date + end date. Ask for whichever is missing, then run **exactly this command** (the one permitted addition, `--all-site-types`, is described just below):
 
 ```
 cd <REPO> && ./.venv/bin/python main.py --search "<LOCATION>" --start YYYY-MM-DD --end YYYY-MM-DD
@@ -131,7 +131,9 @@ cd <REPO> && ./.venv/bin/python main.py --search "<LOCATION>" --start YYYY-MM-DD
 
 Cross-month ranges work (e.g. `--start 2026-07-30 --end 2026-08-02`). A 15-day range over ~40 campgrounds takes 20–40 seconds; that's normal.
 
-**Output is a single JSON object.** Top level: `anchor` (the rec area the query resolved to, e.g. "Yosemite National Park" — results are sorted by distance from it and keyword matches more than 150 km away are listed in `skipped_far[]` instead of being checked), `facilities_total` (how many facilities RIDB matched, including ones skipped as too far), `facilities_scanned` (how many were actually checked), `skipped_far[]`, `unreachable[]`, `partial[]` (a month that couldn't be checked for a facility), `warnings[]`, `results[]`. `sample_sites` puts any site with a 2-night window first, so when `contiguous` is true the first sample site is the one to link. Each result: `name`, `official_name`, `facility_id`, `rec_area`, `distance_km`, `available_dates` (nights), `open_site_count`, `sample_sites[]` (up to 5 sites with the most open nights: `site`, `loop`, `campsite_type`, `min_people`/`max_people`, `dates`, `url`), `stay_rules`, `reservation_url`, `contiguous`.
+Add `--all-site-types` **only** when the user explicitly wants a group site or a boat-in site ("group camp for 15", "we're kayaking in"). Without it those sites are skipped. With it `site_types` reads `"all"`, and each result tells you what it contains: `special_open_sites` (e.g. `{"group": 1, "boat_in": 2}` — how many of its open sites are group / boat-in) and `sample_sites[].category` (`"group"`, `"boat_in"`, or null for an ordinary site). A result whose `special_open_sites` lacks the category the user asked for has nothing for them — say so rather than offering its ordinary sites. Every category that is open gets at least one sample site; check `min_people`/`max_people` against the party size, and read the `site` label (a group beach labelled "BOAT ONLY" is `boat_in`). If the wanted site is not among the samples, send `reservation_url`.
+
+**Output is a single JSON object.** Top level: `site_types` (`"standard"` = group and boat-in sites skipped, the default; `"all"`), `anchor` (the rec area the query resolved to, e.g. "Yosemite National Park" — results are sorted by distance from it and keyword matches more than 150 km away are listed in `skipped_far[]` instead of being checked), `facilities_total` (how many facilities RIDB matched, including ones skipped as too far), `facilities_scanned` (how many were actually checked), `skipped_far[]`, `unreachable[]`, `partial[]` (a month that couldn't be checked for a facility), `group_or_boat_only[]` (facilities whose only openings were group / boat-in sites — not in `results`), `warnings[]`, `results[]`. `sample_sites` puts any site with a 2-night window first, so when `contiguous` is true the first sample site is the one to link. Each result: `name`, `official_name`, `facility_id`, `rec_area`, `distance_km`, `available_dates` (nights), `open_site_count`, `excluded_open_sites` (e.g. `{"group": 2, "boat_in": 1}` — open but not counted; default mode), `special_open_sites` (same shape, counted; `--all-site-types` only), `sample_sites[]` (up to 5 sites with the most open nights: `site`, `loop`, `campsite_type`, `min_people`/`max_people`, `dates`, `url`), `stay_rules`, `reservation_url`, `contiguous`.
 
 **First reply — availability only, no links, no tables.** Telegram doesn't render Markdown tables, so present as a plain bullet list, contiguous first, with the rec area when it isn't the place the user named:
 
@@ -193,6 +195,8 @@ What it does, left to right:
 5. On non-empty, `osascript` fires a macOS notification.
 
 A run that was rate-limited writes a `warnings` entry into the log but does not notify — mention that the log is where to look if notifications go quiet. Crashes go to `/tmp/campsitescout.err`.
+
+The watch uses the default filter, so group and boat-in openings never notify. A watch for group sites only is not supported; say so if asked.
 
 **Two variants to offer.** If the user wants at least two nights, gate on `contiguous` instead so a lone orphan night doesn't page them: replace `'.results | length > 0'` with `'[.results[] | select(.contiguous)] | length > 0'`. To put names in the banner, add `$(<JQ> -r '[.results[].name] | join(", ")' /tmp/campsitescout.log | tail -1)` into the notification text.
 

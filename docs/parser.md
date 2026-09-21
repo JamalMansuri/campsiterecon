@@ -26,6 +26,10 @@ Every Rec.gov link in the output comes from `campground_url`, `site_url` or `per
 
 `RawCampgroundResponse.model_validate` on the whole payload meant one campsite record with a null where a string/int was expected aborted the entire run. `validate_campground(raw)` validates each site separately, skips (and counts) the ones that fail, and `RawSiteAvailability`'s before-validators coerce the common drift (null booleans, `""` counts, non-string labels, null statuses) to defaults. The count surfaces as `skipped_sites` and a `warnings[]` line.
 
+## `site_category` — group and boat-in
+
+`site_category(site)` returns `"boat_in"`, `"group"` or `None` from Rec.gov's fixed `campsite_type` vocabulary (case- and whitespace-insensitive): `BOAT IN` / `MOORING` / `ANCHORAGE`, or any type containing the word `BOAT` → boat-in; any type containing the word `GROUP` → group; boat wins when both apply. The site label plays two limited roles. It **refines a GROUP type**: Rec.gov types Point Reyes' boat-only group beaches as plain `GROUP TENT ONLY AREA NONELECTRIC` with the access only in the label ("TOMALES BEACH GROUP, BOAT ONLY, 15-25 people"), so a GROUP-typed site whose label contains the word `BOAT` is boat-in. And it **stands in for a missing type** (`008 GROUP`, `BOAT A, 1-6 people`). It never turns an ordinarily-typed site into a special one (`HIKE TO` + "BOAT LAUNCH VIEW 4" stays ordinary), and matching is on whole words, so `GROUPER COVE` is not a group site. [search.md](search.md) uses it to skip those sites by default; weekend mode does not.
+
 ## `collect_open_sites` — the filter chain
 
 For each campsite in the response, in order:

@@ -130,6 +130,8 @@ python main.py --search "Tahoe" --start 2026-07-30 --end 2026-08-02
 
 Search mode pages through every RIDB match (RIDB caps pages at 50) and reports where each campground actually is (`rec_area`) — a "Yosemite" search legitimately returns Stanislaus NF and BLM Merced River campgrounds too. Wilderness permits (Yosemite Wilderness, Half Dome) are skipped.
 
+Group and boat-in campsites are skipped by default (they are reported in `excluded_open_sites` / `group_or_boat_only`, never counted as availability); pass `--all-site-types` to include them.
+
 **Verify + debug:**
 
 ```bash

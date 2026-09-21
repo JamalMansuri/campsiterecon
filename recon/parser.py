@@ -48,6 +48,35 @@ def _serialize_windows(windows: list[tuple[date, date]]) -> list[tuple[str, str]
     return [(s.isoformat(), e.isoformat()) for s, e in windows]
 
 
+_BOAT_TYPES = frozenset({"BOAT IN", "MOORING", "ANCHORAGE"})
+
+
+def site_category(site: RawSiteAvailability) -> str | None:
+    """"group" / "boat_in" for campsites an ordinary camper cannot use, else None.
+
+    Rec.gov's campsite_type vocabulary is fixed: every group type contains the
+    word GROUP ("GROUP HIKE TO", "GROUP TENT ONLY AREA NONELECTRIC", ...) and
+    water-access sites are BOAT IN / MOORING / ANCHORAGE. Boat wins over group:
+    a boat-only group beach is unreachable either way, and Rec.gov types those
+    as plain GROUP with the access only in the label ("TOMALES BEACH GROUP,
+    BOAT ONLY, 15-25 people") — so a GROUP-typed site whose label says BOAT is
+    boat_in. The label can refine a group site or stand in for a MISSING type;
+    it never turns an ordinarily-typed site into a special one.
+    """
+    words = (site.campsite_type or "").upper().split()          # split() also normalises stray whitespace
+    label = (site.site or "").upper().replace(",", " ").split()
+    if " ".join(words) in _BOAT_TYPES or "BOAT" in words:
+        return "boat_in"
+    if "GROUP" in words:
+        return "boat_in" if "BOAT" in label else "group"
+    if not words:
+        if "BOAT" in label:
+            return "boat_in"
+        if "GROUP" in label:
+            return "group"
+    return None
+
+
 def _loop_matches(site: RawSiteAvailability, loop: str | None) -> bool:
     if loop is None:
         return True
