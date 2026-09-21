@@ -99,6 +99,10 @@ California State Parks (Pfeiffer Big Sur, Andrew Molera, Limekiln, Mt Tam, Samue
 
 To check a location that isn't a preset, use search mode — no code change required.
 
+## What's next
+
+Proposed features and known follow-ups live in [docs/roadmap.md](docs/roadmap.md): party-size matching, a hot-watch cadence for last-minute cancellations, California State Parks via ReserveCalifornia, smoke/AQI in the forecast, and more. None are built yet.
+
 ## Deploying to the Mac mini
 
 Production runs from a separate clone on the JamBot Mac mini, and OpenClaw loads its own copy of `SKILL.md`, so a change is not live until that box has it. The pipeline is: push to `main` → [CI](.github/workflows/ci.yml) runs the offline suite on GitHub → a LaunchAgent on the box ([deploy/auto_deploy.sh](deploy/auto_deploy.sh), every 15 min, outbound only) sees a new green commit → [deploy_jambot.sh](deploy_jambot.sh) fast-forwards, re-tests (rolling back on failure), installs `SKILL.md` → the OpenClaw gateway restarts. One-time setup and the reasoning (why not a self-hosted runner on a public repo) are in [docs/deploy.md](docs/deploy.md).

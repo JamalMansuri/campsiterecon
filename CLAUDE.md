@@ -18,6 +18,7 @@ All three emit JSON consumed by OpenClaw → Telegram.
 
 - [docs/README.md](docs/README.md) — wiki index. One curated page per module under [recon/](recon/). Read this before exploring source.
 - [docs/auto-cart-mvp-plan.md](docs/auto-cart-mvp-plan.md) — canonical plan for the in-flight Playwright auto-cart extension. Phase tracker lives here.
+- [docs/roadmap.md](docs/roadmap.md) — proposed features and known follow-ups, with the external facts already researched (endpoints, limits, traps). Read the relevant entry before starting any of them; none are implemented.
 - [docs/camply-attribution.md](docs/camply-attribution.md) and [docs/banool-attribution.md](docs/banool-attribution.md) — what was borrowed (and what was deliberately *not* borrowed) from prior art.
 - [SKILL.md](SKILL.md) — OpenClaw runtime instructions. Public-facing for the LLM at runtime.
 
